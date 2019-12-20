@@ -1,0 +1,384 @@
+<html>
+<head><title>Bug Report</title></head>
+<body bgcolor="#ffffff" text="#000000">
+
+<h2 align="center"><font color="#c00000">Bug Report<br>
+Browser Hangs After Access Through modowa</font></h2>
+<h4 align="center"><font color="#000080"><i>Doug McMahon</i></font></h4>
+<h4 align="center">May 30, 2000</h4>
+
+<h4>Synopsis</h4>
+<dir>
+<p>
+I have recently discovered a problem with the operation of modowa when
+configured to connect directly to the Oracle database (rather than via
+SQL*Net).  This problem manifests itself in a client's browser session
+after an access through modowa; the browser appears to &quot;hang&quot;
+on a subsequent request.  Generally, stopping the request and resubmitting
+it will then succeed.  The problem is due to subtle interactions between
+Apache and Oracle.  The purpose of this note is to document what I've
+come to understand about the problem, what I suspect the underlying
+cause may be, and to suggest some corrective/preventative actions.  As
+a secondary purpose, I'm hoping someone will read this and know of a
+solution I've missed and/or be able to explain exactly what's happening.
+</p>
+</dir>
+
+<h4>What Causes the Problem?</h4>
+<dir>
+<p>
+I have not found the direct cause, though I have a theory (described
+below).  Through lots of testing, I have found that the problem tends
+to occur:
+</p>
+<font color=#c00000><ul type=disc>
+<li>when connecting directly to a database on the same machine, i.e.
+via ORACLE_SID rather than the <i>@alias</i> appearing in a connect string</li>
+<li>when the browser/user pauses between requests that are routed to modowa,
+after receiving a request where the content length is specified (e.g. a binary
+file download)</li>
+</ul></font>
+<p>
+The problems seems not to occur:
+</p>
+<font color=#000080><ul type=disc>
+<li>when the database is on another machine and/or the connection from modowa
+is made via SQL*Net</li>
+<li>after responses where the content length is not available</li>
+<li>between requests from a browser/user if there is little delay between
+the requests</li>
+</ul></font>
+<p>
+Through lots of debugging of the internals of Apache, I have determined that
+the proximate cause of this failure is the expiration of the Apache keepalive
+timer for the connection to the browser, and the subsequent closure of that
+connection.  Here's what I know for sure:
+</p>
+<ul type=disc>
+<li>By carefully inspecting the state of the Apache connection before and
+after a modowa request, I have determined that sending a content length
+(which modowa does under circumstances documented below) triggers Apache
+to set the keepalive bit on the connection.  This is an HTTP 1.1 feature
+that enables a browser to reuse a connection within a short time window
+(a few seconds in my tests) without incurring the overhead of a new
+connection.</li>
+<li>By setting some diagnostics on the keepalive timer, I am able to
+show that if the browser sends modowa another request before the timer
+expires, the request is serviced properly.  If, however, the timer is
+allowed to expire, the very next request sent to modowa will get
+stuck somewhere; <strong>Apache never sees the request</strong>.
+</ul>
+</dir>
+
+<h4>Avoiding the Problem</h4>
+<dir>
+<p>
+There are basically two ways to avoid the problem:
+</p>
+<ol type=1 start=1>
+<li>Always use SQL*Net to connect to the database.</li>
+<li>Modify modowa to skip transmission of <i>Content-Length</i>
+under some circumstances.</li>
+</ol>
+<p>
+In the more recent versions of the code, modowa sends a <i>Content-Length</i>
+under the following circumstances:
+</p>
+<ul type=disc>
+<li>For any binary file download (but not for character file downloads,
+because it can't be sure the byte length will still be correct after
+character-set conversions have taken place).</li>
+<li>Whenever your PL/SQL code returns one (it's taking this on faith,
+since the byte length of the response page you send is subject to
+character-set conversion - don't do this unless you're sure the
+data is ASCII or you're sure you're only running single-byte in both
+the database and Apache).</li>
+<li>Whenever modowa knows for sure what the content length of a response
+page is (this is true only when modowa encounters the end of your page
+on the very first call to OWA.GET_PAGE, since modowa then has the entire
+page in memory - modowa fetches a block of approximately 200K bytes, so
+this condition will be true quite frequently).</li>
+</ul>
+<p>
+Unfortunately these efforts to send the content length back whenever
+possible have aggravated the problem.  The latest version of the code
+now checks the SQL*Net connect strings for the presence of a SQL*Net
+alias string (e.g. <i>@database</i>), and if it doesn't find one on
+a Location directive, it assumes the worst and disables content length
+returns.
+</p>
+</dir>
+
+<h4>Finding the Problem</h4>
+<dir>
+<p>
+I began observing these browser hangs intermittently.  At first they
+seemed almost random.  Then, over time, I began to experience them more
+frequently.  I finally began to see a rough correlation with waiting
+at least a small amount of time before hitting the server with the
+followup request.  But this wasn't conclusive; it happened to some
+requests, not to others.  Also, it seemed to clear up after a while;
+the system seemed most vulnerable shortly after being started up.  Finally,
+I never saw the problem anywhere except on Linux, never on NT or Solaris.
+</p>
+<p>
+Diagnostics placed in the code didn't help; as far as I could tell,
+modowa was simply never receiving the request that was getting
+&quot;stuck&quot;.  Clearly the request was getting held up somewhere
+else.  I began looking carefully at the state of the pool of Apache
+worker processes (on Unix, Apache's not multi-threaded - more on that
+later).  I discovered that at any given instant one worker process was
+always in an I/O wait state, while the others were blocked on some sort
+of latch.  After a request was serviced, I would see that a different
+worker now held the I/O state, while the process that had serviced
+the request had become one of the latched processes.  I also observed
+that <strong>none</strong> of the processes changed state when the
+stuck request was sent, a clue that the request was not even being
+dispatched to <strong>any</strong> of the workers.
+</p>
+<p>
+As noted earlier, I placed some diagnostics into Apache's
+<b><tt>httpd_main</tt></b> to tell me what each process was up
+to.  I also wrote a dummy module that did nothing but send back a
+very simple HTML page.  I found that the dummy module always worked
+reliably, whereas modowa would always fail the first time after the
+keepalive timer expired.  By comparing the behavior of the two modules,
+I was able to determine that the dummy module was simply not triggering
+the keepalive operation at all; instead, it was causing Apache (and,
+presumably, the browser) to close the connection every time.  I
+ eventually tracked this down to the fact that the dummy module wasn't
+returning a <i>Content-Length</i> in the HTTP response header, but modowa
+was.  Clearly, the presence of a content length was triggering the
+keepalive behavior in Apache.
+</p>
+<p>
+On making this discovery, I initially thought that there must be a bug in
+the Apache keepalive logic.  This would certainly explain why the problem has
+gotten worse over time; the original modowa never returned a content
+length, but the current implementation returns one under many if not most
+circumstances (as described earlier).  I modified the dummy module to
+return a content length, too, expecting it to begin failing in a fashion
+similar to modowa.  However, the dummy module continued to work perfectly
+even when sending the <i>Content-Length</i> every time; after the keepalive
+expires, a subsequent request from the browser is serviced without any
+problem at all.
+</p>
+<p>
+I looked very carefully at Apache's connection processing logic, especially
+the closure logic.  It seemed clear to me that the stuck request was never
+being read by Apache.  The only thing that might explain this would be if
+the browser was still sending requests to Apache on a socket connection that
+Apache had dropped.  When the keepalive timer expires, Apache closes the
+connection to the browser.  Diagnostics in this code show that it
+occurred identically in both cases (on the Apache side), but symptomatically 
+in the modowa case the browser would hang a subsequent request but in the
+case of the dummy module it would not.  Strangest of all, I observed that
+after a block had occurred on a particular process, that process would
+usually start working reliably on subsequent modowa requests.  This isn't
+apparent to the browser user, because requests are just assigned to worker
+process on a first-come, first-served basis; over time, though, the problem
+eventually will occur and be &quot;cleared&quot; on every worker (at least,
+until the worker reaches its request limit and gets killed, starting the
+cycle all over again).
+</p>
+<p>
+At this point I began to suspect that the problem was some sort of
+interaction between the way that Oracle handles requests for SQL, and
+the way Apache handles HTTP requests (on Unix).  I also started
+thinking about the fact that I hadn't observed the problem on NT or
+Solaris.  Since my database was running on Linux, modowa was always tested
+on the other platforms with a connection via SQL*Net.  To see if this might
+be related to the problem, I switched my Linux server from making a direct
+ORACLE_SID-based connection to using SQL*Net, and suddenly the problem
+vanished!
+</p>
+<p>
+Now at least I had a theory about the source of the problem, but to follow
+it you have to know a little bit about how both Apache and Oracle work.  So,
+forgive the brief digression while I describe both of them.
+</p>
+</dir>
+
+<h4>How Apache Handles Requests</h4>
+<dir>
+<p>
+It took some time, but I believe I at last understand how Apache works
+on Unix.  The current 1.3.x generation of the listener is not multi-threaded
+on Unix.  Instead, when you start Apache, a manager process starts a number
+of worker processes and then monitors the health of the workers from that
+point on.  The manger is not involved in dispatching requests.  Instead,
+all workers have access to the common set of sockets on which requests and
+events will come in.  There is a mutex that is used to ensure that at
+any one time, only one process has control of the sockets.  This process
+is then in a wait state for I/O while all other workers are either finishing
+up other requests or stopped while waiting to acquire the mutex.  When a
+request comes in, this activates the worker that was listening on the
+socket; the worker notifies the browser that it accepts the request,
+arranges with the browser for a limited-duration direct connection through
+which the request and response will travel, and releases the mutex (which
+will then be acquired by the next available worker).
+</p>
+<p>
+After picking up a request, the worker services it as necessary and then
+will either close the connection to the brower immediately or (if the
+keepalive bit is set) await a further request from the browser on the
+same communications channel.  To avoid tying up the worker for one
+browser indefinitely, a timer eventually fires that wakes up the
+worker and causes it to close down the browser connection.  Regardless
+of whether or not the worker went into a keepalive state, once the
+connection is closed, it goes back and queues up on the mutex again
+to wait its turn for the sockets.
+</p>
+</dir>
+
+<h4>How Oracle Handles Connections</h4>
+<dir>
+<p>
+All Oracle SQL operations, including those sent by modowa, are executed
+by a dedicated worker process called a <i>shadow process</i>.  Except
+in the case of the multi-threaded server, every database connection will
+cause the instantiation of one shadow process.  The shadow processes
+actually do most of the processing associated with database operations.  The
+shadow processes require access to the shared memory of the database and
+to the files where the database actually keeps data, so they must run
+on the same machine (or cluster) as the database itself.
+</p>
+<p>
+When a program such as modowa makes a connection to the database, one of
+these worker process has to get created to service that connection.  In
+the general case, the client program is not executing on the same machine
+as the database, so the job of spawning the shadow process falls to the
+SQL*Net listener.  The client program sends a request to the listener,
+and the listener spawns a process on the (possibly remote) machine which
+then establishes a two-way connection to the client for SQL traffic.
+</p>
+<p>
+In the case where both the client and the database are running on the same
+machine, there is a more direct way to make a connection to the database,
+namely the use of ORACLE_SID and the so-called &quot;bequeath&quot;
+connector.  Technically this is also a part of the SQL*Net stack, but it
+doesn't go through the listener; in fact, you can shut down your SQL*Net
+listener on the database machine and still make a connection via
+ORACLE_SID.  The direct connection means that your client program is,
+in effect, spawning the database shadow process by itself.
+</p>
+</dir>
+
+<h4>Theory</h4>
+<dir>
+<p>
+Now armed with all these facts, here's my theory as to what's going wrong:
+</p>
+<font color=#c00000><blockquote>
+When an Oracle request is handled for the first time, modowa has to
+connect to the database, and, if the bequeath connection mode is indicated,
+this involves spawning a shadow process.  If the operation in question
+eventually results in a Content-Length being returned, this triggers the
+Apache keepalive logic, and also causes the browser to keep the connection
+open.  The browser doesn't have a timeout; instead, the browser is relying
+on the server to signal it if the connection gets dropped.  Apache doesn't
+do anything to signal the closure to the browser, there's no <i>final</i>
+message sent; instead, it simply closes the socket, apparently assuming that
+the browser will get an error the next time it tries to transmit on that
+connection and thereby determine that it's no longer valid.  Unfortunately,
+the Oracle shadow process, which was forked from the original Apache process
+at a point in time when the socket was open, still has a valid handle to the
+socket, and my guess is that Linux doesn't error out the browser's follow-up
+request, it simply accepts it and dumps it into memory in hopes that the
+Oracle shadow process will eventually pick it up.  Of course it won't, so
+the browser blocks indefinitely waiting for a response than never comes and
+never times out.
+</blockquote></font>
+<p>
+The theory sure seems to fit the facts.  Why did the problem get worse in
+recent versions of modowa?  It started to get worse after the file download
+logic was added, because for the first time modowa would, under some
+circumstances, send a content length as part of the response.  Because of
+the pool-process architecture on Unix, it was the luck of the draw - if the
+download request happened to be the first request serviced by a particular
+process, you'd encounter the error once for that process, clear it, then
+perhaps encounter it again on another &quot;virgin&quot; process.  After
+the change that included content lengths for all short response pages, the
+probability of encountering the problem jumped to a virtual certainty; only
+if your very first request to a process was for a character-based document
+download, or a large response page without a PL/SQL-supplied length
+in the header, would you avoid running into the problem.  Why doesn't the
+problem appear for SQL*Net-based connections?  For these connections, the
+shadow process is spawned by the SQL*Net listener, not by Apache/modowa, so
+there's no lingering &quot;clone&quot; of the browser connection left around
+after the keepalive timeout expires.
+</dir>
+
+<h4>Fixing the Problem</h4>
+<dir>
+<p>
+Bearing in mind that I'm not completely sure the above explanation is
+correct, I've been wondering how to work around this problem.  I could
+simply stop sending content lengths, but this seems sub-optimal because
+it prevents browsers from taking advantage of the improved efficiency
+of the short-lifespan connection to Apache, and of course it means that
+the browser doesn't get a proper length for the object being downloaded
+(which matters in situations such as displaying the progress bar in
+the download box).  I could document a restriction that modowa be used
+only with SQL*Net connections, i.e. that the bequeath connector is not
+supported, but this seems rather drastic and limiting (even though most
+users are probably running Apache and the database on separate boxes
+anyway, and the rest can just use SQL*Net).  Here's what the latest
+patch of the code does:
+</p>
+<font color=#000080>
+<ul type=disc>
+<li>If modowa is certain that a configured Location is using SQL*Net, it
+assumes it's OK to send content lengths for responses on that Location.  It
+checks this by looking for the &quot;@&quot; sign in the connect string.</li>
+<li>If modowa determines that a Location is not using SQL*Net, then it
+does <strong>not</strong> send a <i>Content-Length</i> in response to the
+very first operation for any newly-established database connection; this
+should cause both Apache and the browser to close the connection used for
+that first request, thus making the &quot;clone&quot; held by the shadow
+process irrelevant.</li>
+</ul>
+</font>
+<p>
+The exception for the first case is very simple code, and so I recommend
+using SQL*Net if at all practical because it seems to avoid the problem
+entirely.
+</p>
+<p>
+In the second case, it might be safer to disable the content length logic
+entirely.  There is a possibility of a problem if a set of Locations
+for a single Apache instance use a mixture of SQL*Net and ORACLE_SID-based
+connections.  In this case, it would seem possible that a worker process
+could be called upon to initiate the bequeathed connection at a time when
+it still has a connection held for a browser whose last request was to a
+SQL*Net-based Location, and thus create a troublesome connection
+&quot;clone&quot;.  I don't think this can really happen, though;
+the connection would have to get closed before the worker would go back
+to listening for new traffic from other browsers, and if the request that
+caused the creation of the bequeathed connection came from the same browser,
+that connection should be killed automatically when the response comes
+back without the content length.
+</p>
+<p>
+I haven't looked carefully at the situation on Windows NT.  My belief
+is that this problem doesn't occur there, because a different mechanism
+is used to create shadow process threads.  The code reflects this by
+#ifdefing out the keepalive hack for that platform.  Note, however, that
+in general when Apache is multithreaded, it is not safe to send content
+lengths as long as <strong>any</strong> managed connection is using
+the Unix bequeathed mechanism, because of the possibility that the
+creation of a shadow process could pick up &quot;clones&quot; of the
+in-flight communication handles of other threads.  So, if/when Apache
+becomes multithreaded on Unix, a different hack will be needed.
+</p>
+<p>
+The only permanent solution to this problem would involve changing the
+spawn logic for the bequeath adaptor such that file handles not being
+used specifically by the connection to Oracle are explictly closed.  It
+might also be a good idea for Apache to transmit an HTTP close message
+to the browser, too, before disconnecting.
+</p>
+</dir>
+
+</body>
+</html>

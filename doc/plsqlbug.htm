@@ -1,0 +1,153 @@
+<html>
+<head><title>Bug Report</title></head>
+<body bgcolor="#ffffff" text="#000000">
+
+<h2 align="center"><font color="#c00000">Bug Report<br>
+Database Crashes Passing Basic Authentication from modowa</font></h2>
+<h4 align="center"><font color="#000080"><i>Doug McMahon</i></font></h4>
+<h4 align="center">March 27, 2001</h4>
+
+<h4>Synopsis</h4>
+<dir>
+<p>
+Several users have reported that they are experiencing database crashes
+due to the new code added for compatibility with OWA_SEC operations.  This
+code checks for an incoming Basic authentication header and, if one is
+present, decodes it and passes it to the OWA via a PL/SQL anonymous block
+containing two assignment statements.  Unfortunately, if this statement
+is executed after a RESET_PACKAGE operation, PL/SQL will occasionally
+crash, taking down that database process and returning a 3113 error to
+mod_owa.
+</p>
+</dir>
+
+<h4>Symptoms of the Problem</h4>
+<dir>
+<p>
+The symptoms can range from repeated challenges to log in to the site,
+even after you've logged in, to repeated &quot;Internal Server
+Errors&quot;.  In all observed cases, enabling the mod_owa diagnostic
+log reveals that the OCI is returning 3113 error codes (an ORA-3113 means
+that the connection to the database server has been severed, either
+because of a network outage or, as in this case, because the database
+server has crashed).  Internally, the database is crashing with an
+ORA-600 error and dumping a core file.
+</p>
+</dir>
+
+<h4>What Causes the Problem?</h4>
+<dir>
+<p>
+The problem occurs sometimes when executing the assignment statements
+needed to set the OWA package globals for USER_ID and PASSWORD (these
+are where the OWA_SEC functions get the values from).  Originally, I
+had included these two lines with the CGI environment call, thus:
+</p>
+<font color="#000080"><b><dir><pre>
+begin
+  OWA.INIT_CGI_ENV(:ecount, :namarr, :valarr);
+  OWA.USER_ID := :usr;
+  OWA.PASSWORD := :pwd;
+end;
+</pre></dir></b></font>
+<p>
+This was efficient and saved me from requiring an extra round-trip to
+the database.  The code is needed to maintain compatibility with OAS
+behavior used my many sites.
+</p>
+<p>
+Alas, users started to see crashes as a result of this change.  I
+discovered that by moving these lines ahead of the INIT_CGI_ENV call,
+it avoided the crash in many, but not all, situations.  Finally, I
+moved the two lines completely out of this block and into a separate
+database operation, and this seemed to &quot;cure&quot; the problem
+for all cases known at that time:
+</p>
+<font color="#000080"><b><dir><pre>
+begin
+  OWA.USER_ID := :usr;
+  OWA.PASSWORD := :pwd;
+end;
+</pre></dir></b></font>
+<p>
+The problem has been observed on database versions as early as 8.0.5
+and as recent as 8.1.7.  The problem is certainly a bug in the PL/SQL
+engine.  To date, the bug has not been fixed or even pinpointed.  Even
+after Oracle finds/fixes it, there will be a lot of users who have
+versions of the database that still have this defect.
+</p>
+</dir>
+
+<h4>Revisiting the Problem</h4>
+<dir>
+<p>
+Unfortunately, another user has encountered a variant of this same
+problem, even using the new code.  During my earlier testing, I had
+observed that the bug would not occur provided the assignment statements
+were not made directly, but were instead made by a procedure that was
+already in the database.  It turned out that the only way to get this
+particular user running was to make similar modifications.  The fix
+involves adding two APIs to the code of the OWA package.
+</p>
+<ul type="disc">
+<li><font color="#c00000"><tt><b>pubowa.sql:</b></tt></font>
+<font color="#000080"><b><pre>
+/* Package specification includes two new APIs: */
+procedure SET_USER_ID(USR in varchar2);
+procedure SET_PASSWORD(PWD in varchar2);
+</pre></b></font></li>
+<li><font color="#c00000"><tt><b>privowa.sql:</b></tt></font>
+<font color="#000080"><b><pre>
+/* Package body includes these implementations: */
+procedure SET_USER_ID(USR in varchar2) is
+begin
+  OWA.USER_ID := USR;
+end SET_USER_ID;
+procedure SET_PASSWORD(PWD in varchar2) is
+begin
+  OWA.PASSWORD := PWD;
+end SET_PASSWORD;
+</pre></b></font></li>
+</ul>
+
+<p>
+Indeed, the package should probably have these APIs anyway, rather than
+requiring callers to do direct assignment statements.
+</p>
+
+<p>
+On the mod_owa side, a corresponding change is also needed to the PL/SQL
+block:
+</p>
+<font color="#000080"><b><dir><pre>
+begin
+  OWA.SET_USER_ID(:usr);
+  OWA.SET_PASSWORD(:pwd);
+end;
+</pre></dir></b></font>
+</dir>
+
+<h4>Status</h4>
+<dir>
+<p>
+The change separating the two lines appears to enable most users to avoid
+the problem.  If you're not lucky enough to be one of them, I have no other
+option to offer you other than to require you to make PL/SQL-side source
+modifications, rebuild the package, and then flip the switch that causes
+mod_owa to run in this alternate mode.  That switch is the oracle_alt
+directive SETSEC, which you can use in your Location configuration as
+follows:
+</p>
+<font color="#000080"><b><dir><pre>
+oracle_alt OWA SETSEC
+</pre></dir></b></font>
+<p>
+I've logged a bug against PL/SQL and the database team is investigating the
+problem.  I've also asked the iAS team to update the OWA packages so that
+they contain these new APIs out-of-the-box.  At this point, there's not
+much more I can do about the problem.
+</p>
+</dir>
+
+</body>
+</html>

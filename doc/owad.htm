@@ -1,0 +1,203 @@
+<html>
+<head><title>OWA Daemon (owad)</title></head>
+<body bgcolor="white" text="black">
+
+<center>
+<h1>OWA Daemon (owad)</h1>
+<h4><font color="#000080"><i>Doug McMahon</i>
+<br>(dmcmahon@us.oracle.com)</font></h4>
+<h4><font color="#c00000">October 1, 2000</font></h4>
+</center>
+
+<hr size="5" noshade width="50%" align="center">
+
+<h4>Description</h4>
+
+<dir>
+
+<p>
+owad is a simple multithreaded HTTP server that is capable of servicing
+requests destined for mod_owa.  The request handler code of mod_owa is
+linked into the executable, which provides implementations of all the
+APIs normally supplied by Apache.
+</p>
+
+</p>
+Although owad can be run stand-alone, it lacks almost all of the advanced
+web server features available from Apache.  The intended use of owad is
+as a back-end server for OWA-based content, with one or more Apache servers
+acting as the real front for the site.  I used standard HTTP for the
+communications primarily to avoid issues with firewalls.
+</p>
+
+<p>
+The current version of owad is single-process, multi-threaded, though it
+would not be hard to add multi-process support as well.  Although it
+works on NT, It offers no advantage over the direct use of mod_owa in
+Apache.  On Unix, however, it affords deployments with a means to leverage
+the connection-pooling logic of mod_owa despite the single-threaded,
+multi-process architecture of Apache 1.3.x.
+</p>
+
+</dir>
+
+<h4>Configuration</h4>
+
+<dir>
+
+<p>
+Configuring owad is largely the same as configuring mod_owa, since the owad
+has a crude parser that is capable of reading Apache-style .conf files.  Thus,
+you define Location directives as per the documentation for mod_owa.
+</p>
+
+<p>
+owad uses the new Apache 2.0 directive names, as shown in the following
+example:
+</p>
+
+<font color="#000080"><b><dir><pre>
+&lt;Location /owa&gt;
+    SetHandler     owa_handler
+    OwaUserid      owa/owa@orcl
+    OwaNLS         WE8ISO8859P1
+    OwaAuth        OWA_INIT
+    OwaDiag        &quot;COMMAND ARGS CGIENV POOL SQL MEMORY&quot;
+    OwaLog         &quot;/usr/local/apache/logs/mod_owa.log&quot;
+    OwaPool        20
+    OwaStart       &quot;doc_pkg.homepage&quot;
+    OwaDocProc     &quot;doc_pkg.readfile&quot;
+    OwaDocPath     docs
+    OwaDocLong     long
+    OwaUploadMax   10M
+    OwaCharset     &quot;iso-8859-1&quot;
+&lt;/Location&gt;
+</pre></dir></b></font>
+
+<p>
+The functioning of all of these directives is as documented for mod_owa.  Note,
+however, that as with Apache 2.0, OwaPool is now relevant on Unix as well as
+on NT.
+</p>
+
+<p>
+Note that the SetHandler directive must be present and set to
+&quot;owa_handler&quot;, just as for mod_owa, so that owad can
+distinguish Locations it should manage from other locations that
+might be present in the same .conf file (in case you're using the
+same .conf file for both an Apache instance and owad).  All other
+Apache directives are ignored (including the "include" directive -- only
+the file in question will be scanned).
+</p>
+
+<p>
+owad understands the global directive for shared memory, since there's only
+one process involved, the only use for this is as a memory cache.  It
+also understands the global cleanup thread directive and uses the
+time interval to control its own cleanup thread, which (unlike mod_owa)
+is always run (the default is a 1 minute cleanup cycle).
+</p>
+
+<p>
+Please remember that the parser in owad is <strong>extremely crude</strong>,
+so don't challenge it with directives broken across lines, funny characters
+(even tabs might not work), etc.
+</p>
+
+</dir>
+
+<h4>Running owad</h4>
+<dir>
+
+<p>
+owad can be started and stopped from the command line.  It needs values
+for the following parameters to run:
+</p>
+
+<ul type="disc">
+<li>IP address that it should listen on (generally, the IP address of the
+machine you're running it on, but might be an alias such as 127.0.0.1)</li>
+<li>port number to listen on (e.g. 80)</li>
+<li>number of worker threads to start (up to 255)</li>
+<li>path name of configuration file</li>
+</ul>
+
+<p>
+As an example:
+</p>
+
+<font color="#000080"><b><dir><pre>
+owad 127.0.0.1   80    50       /usr/local/apache/conf/owad.conf
+     <font color="#c00000">^           ^     ^        ^
+     <i>IP address  port  threads  configuration file</i></font>
+</pre></dir></b></font>
+
+<p>
+No method for stopping owad is available yet, other than to kill it
+with &quot;kill -1&quot;, &quot;kill -3&quot;, or control-C (works on
+NT if done from the command window where owad is running).
+</p>
+
+</dir>
+
+<h4>Operation</h4>
+
+<dir>
+
+<p>
+owad works by creating a single socket latched by a single mutex, which
+is then shared by all worker threads.  The threads all hang on the latch
+waiting to acquire it.  One thread will succeed and will then hang on
+the socket for the next request.  When received, the thread takes the
+new socket created by the operation and releases the latch so that another
+thread can pick up the next request.  <font color="#c00000"><i>(By
+creating the semaphore and socket prior to forking worker processes,
+owad could in theory support multi-process sharing of the same
+resource; however, I haven't figured out how to make that work on NT
+yet, since NT doesn't have an equivalent of fork() that allows the
+created process to inherit I/O connections, latches, etc.)</i></font>
+</p>
+
+<p>
+owad closes the socket as soon as it finishes servicing the request.  In
+theory, though, it could keep the connection open with the client, and
+if the client was an Apache mod_owa forwarding the request, this
+connection could be reused to reduce overhead on subsequent requests
+(this would amount to a one-to-one mapping of Apache workers to owad
+threads, with one thread dedicated to each worker until explicitly
+released, perhaps by the cleanup thread on the Apache side).
+</p>
+
+<p>
+owad has a very limited ability to serve file-based content.  You can
+specify a single directory which owad will use as the &quot;root&quot;
+for file operations.  This is done via a new directive, OwaFileRoot,
+that works only for owad.  When it receives a URI that cannot be matched
+to any of the OWA locations, it will build a file-system path by
+concatenating the URI to the root path.  (This feature is present mainly
+to help debug owad.)
+</p>
+
+</dir>
+
+<h4>Limitations</h4>
+
+<dir>
+
+<p>
+The HTTP implementation is not particularly robust.  Parsing of many
+header elements for the sub-process environment is weak at present.  Still,
+of the functionality supported by mod_owa, only range transfers were left out.
+</p>
+
+<p>
+Note that some operating systems have per-process limits on certain
+resources, such as file descriptors.  Since I believe each socket
+uses such a resource, this may mean a lower practical limit on the
+number of threads than the 255 nominally supported.
+</p>
+
+</dir>
+
+</body>
+</html>

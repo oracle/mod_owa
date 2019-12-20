@@ -1,0 +1,83 @@
+<html>
+<head><title>OWA test form</title></head>
+<body bgcolor=#e0e0f0 text=#000000>
+<h2 align=center>OWA test form</h2>
+
+<hr width="100%" size="3" "noshade">
+<p>Test named arguments using GET</p>
+<form action="/examples/owa/modowa_test_pkg.test_arguments" method="GET">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td><input type="text" size="30" name="A"></td>
+<td><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test named arguments using POST</p>
+<form action="/examples/owa/modowa_test_pkg.test_arguments" method="POST">
+<input type="hidden" name="N" value="10">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td><textarea rows="3" cols="30" name="A"></textarea></td>
+<td><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test positional arguments with array</p>
+<form action="/examples/owa/^modowa_test_pkg.test_array" method="POST">
+  <input type="hidden" name="N" value="2">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td><input type="text" size="30" name="A"></td>
+<td><input type="text" size=30 name="A"></td>
+<td><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test flexible arguments</p>
+<form action="/examples/owa/!modowa_test_pkg.test_flex" method="GET">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td><input type="text" size="30" name="ARG1"></td>
+<td><input type="text" size=30 name="ARG2"></td>
+<td><input type="image" name="ARG3" src="/apache_pb.gif"></td></tr>
+<td><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test cookies</p>
+<form action="/examples/owa/modowa_test_pkg.test_cookie" method="GET">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td><input type="text" size=30 name="A"></td>
+<td><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test non-HTML return types</p>
+<p>
+<a href="/examples/owa/modowa_test_pkg.test_plain?">Plain Text</a><br>
+<a href="/examples/owa/modowa_test_pkg.test_xml">XML</a><br>
+<a href="/examples/owa/modowa_test_pkg.test_redirect?u=/">Redirect</a><br>
+<a href="/examples/owa/modowa_test_pkg.test_noheader?u=X">No header response</a><br>
+<a href="/examples/owa/docs/">Document read</a>
+</p>
+</form>
+
+<hr width="100%" size="3" "noshade">
+<p>Test file uploading to LOBs</p>
+<form action="/examples/owa/demo_documents_pkg.writefile"
+      method="POST" enctype="multipart/form-data">
+<table cellspacing="3" cellpadding="3" border="0">
+<tr><td align="right">Virtual Directory&nbsp;</td>
+    <td><input type="text" size="30" name="directory"></td></tr>
+<tr><td align="right">First file&nbsp;</td>
+    <td><input type="file" size="30" name="fname"></td></tr>
+<tr><td align="right">Second file&nbsp;</td>
+    <td><input type="file" size="30" name="fname"></td></tr>
+<tr><td colspan="2"><input type="submit" value=" Test "></td></tr>
+</table>
+</form>
+
+</body>
+</html>

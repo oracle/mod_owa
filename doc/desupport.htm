@@ -1,0 +1,280 @@
+<html>
+<head><title>Desupport Notices</title></head>
+<body bgcolor="white" text="black">
+
+<center>
+<h1>Desupport Notices</h1>
+<h4><font color="#000080"><i>Doug McMahon</i>
+<br>(Doug.McMahon@oracle.com)</font></h4>
+<h4><font color="#c00000">September 24, 2013</font></h4>
+</center>
+
+<hr size="5" noshade width="50%" align="center">
+
+<h4>Summary</h4>
+
+<dir>
+
+<p>
+As of the 2.10.0 version of mod_owa, I will no longer support some older
+Apache or OCI versions, and will no longer provide builds for older versions
+of Windows. Please read this notice carefully.
+</p>
+
+<ul type="disc">
+<li>Dropping source code that builds with the Oracle 7 (UPI) client stack</li>
+<li>Dropping source code that builds with the obsolete Oracle 8.0 OCI</li>
+<li>Dropping source code that builds with Apache 1.3</li>
+<li>No longer providing binaries for Apache 1.3 or Apache 2.0</li>
+<li>No longer providing 32-bit binaries</li>
+<li>Using Vista as the oldest Windows version supported by binaries</li>
+</ul>
+
+</dir>
+
+<h4>Oracle 7 (UPI)</h4>
+
+<dir>
+
+<p>
+I'm removing the source code that supports the older UPI stack. This stack
+was never exposed to customers anyway, so only I am able to build executables
+with that code path. This code was useful many years ago when some users
+were still running Oracle 7 client stacks. The code was developed to run on
+OCI8, which became available in Oracle 8.0 and is a customer interface
+supported by Oracle. Going forward, this will be the only code path in
+mod_owa.
+</p>
+
+</dir>
+
+<h4>Oracle 8.0 OCI</h4>
+
+<dir>
+
+<p>
+I'm removing the source code that supports the original Oracle 8.0 version of
+OCI. You'll need an 8.1 or higher OCI to build or run the module. There is only
+one difference, which is that after 8.0 Oracle corrected a problem with the
+initialization of the OCI, wherein clients were required to call
+<tt><b>OCIInitialize</b></tt> exactly once before any other OCI code. In newer
+versions, <tt><b>OCIEnvCreate</b></tt> handles this. I've not produced an older
+binary in over a decade, so my belief is that no users are still depending on
+this (but, since the module is open-source, someone might still be building
+them him/herself).
+</p>
+
+<p>
+In the future, I may drop support for OCI libraries earlier than 10.x.
+The reason is that the 9.x and earlier libraries did not have LOB
+interfaces capable of handling LOBs larger than 2 Gbytes.
+</p>
+
+</dir>
+
+<h4>Apache 1.3 compatible source code</h4>
+
+<dir>
+
+<p>
+mod_owa was originally written for Apache 1.3, then ported to Apache 2.0 and
+2.x versions. I used difficult-to-read macros to support all these Apaches
+from a single source code base. As of 2.10.0 I will be dropping the 1.3
+variant of the source code, meaning it will no longer be possible to produce
+a 1.3 compatible build from newer source versions.
+</p>
+
+</dir>
+
+
+<h4>Apache 1.3 and 2.0 Binaries</h4>
+
+<dir>
+
+<p>
+At this point, I believe I'm wasting my time producing binaries for them.
+Apache doesn't even make all of these available on their site anymore.
+It's also becoming a hassle to keep versions of Apache 1.3 around to build
+against. I will no longer produce these binaries, and as noted above it
+won't even be possible to produce a 1.3 version.
+</p>
+
+<p>
+I may also stop providing binaries for Apache 2.0, though I will retain the
+hooks in the code supporting that version. That version isn't quite compatible
+with 2.2 and 2.4, and is quite old. 64-bit Windows binaries aren't available
+anymore to build against. 2.0 will still be supported by the code; users
+who need a 2.0 version will still be able to build their own versions
+from the source code.
+
+</dir>
+
+<h4>32-bit binaries</h4>
+
+<dir>
+
+<p>
+I haven't produce 32-bit Linux binaries of mod_owa in some years now. For
+reasons explained below, I have been limited to producing 32-bit binaries
+on Windows. However, I will no longer produce 32-bit binaries for Windows,
+and will move to 64-bit builds concurrent with the move to a newer Windows
+build environment.
+</p>
+
+<p>
+This doesn't mean 32-bit operation won't be supported; it should still be
+possible to build 32-bit binaries for any platform from the source code.
+</p>
+
+</dir>
+
+<h4>Windows Binaries</h4>
+
+<dir>
+
+<p>
+In theory, mod_owa on Windows is the same as on Linux - users can download
+the source and build a version that meets their needs on almost any
+version of Windows, for any version of Apache, any version of Oracle past
+8.0, and in either 32-bit or 64-bit mode. In practice, I've found that most
+people who are running Windows lack the ability to build mod_owa from source
+code, and need to use the binaries I produce.
+</p>
+
+<p>
+As of the 2.10.0 version, I will be moving my Windows build environment
+to the Vista SDK, the oldest SDK I can readily find on Microsoft's web site.
+This means I'll finally be able to produce 64-bit binaries for Windows.
+However, it also means the binaries won't work on older versions of the
+Windows operating system (see the table below).
+</p>
+
+<p>
+As background, I have for years produced Windows binaries using an ancient
+version of the Visual C++ compiler, version 6.0, which appears to be the
+last stand-alone C compiler Microsoft produced. I've done this because some
+years ago I attempted to move up to Visual Studio 2003, and immediately
+got emails from users who reported that the resulting binaries won't work
+on their systems. The unfortunate symptom is that Apache just won't start
+if there are unsatisfied dependencies or other issues with a DLL that it
+can't load - there is no helpful error message to explain what was wrong.
+I quickly went back to VC 6.0, and I've been using it ever since, despite
+limitations such as the inability to produce a 64-bit executable.
+</p>
+
+<p>
+I've since learned that the incompatibility is due to a number of factors:
+</p>
+
+<ol type="1">
+<li>Mismatch of the internal OS version number - Windows gives an extremely
+unhelpful error message about the executable not being a Windows
+application, instead of telling you there's a version mismatch.</li>
+<li>Dependency on newer C runtime library versions.</li>
+<li>64-bit versus 32-bit - uses should know this in advance, but it's
+unfortunate that the OS doesn't produce a helpful error message when an
+attempt is made to load a DLL with the wrong structure.</li>
+</ol>
+
+<p>
+The OS version number issue is the most annoying, because the error messages
+simply confuse users. It appears that the linker will write a version number
+that depends on the version of Visual Studio used to build the executable,
+the version of the so-called platform SDK used during the build, and to some
+extent link-time flags. This is really nothing more than a nuisance for a
+command-line program or pluggable DLL such as mod_owa. You can see what
+version numbers are baked into an executable, including a DLL, using
+Microsoft's <tt><b>DUMPBIN</b></tt> utility.
+</p>
+
+<p>
+The C runtime library dependency is more troubling, and seems impossible to
+work around. mod_owa carefully avoids using <strong>any</strong> calls to
+functions from the C runtime library on Windows, because when I originally
+wrote it I feared exactly this sort of issue. Unfortunately, the compiler
+appears to bake in some dependencies anyway. Even using my very old VC 6.0
+I see a handful of dependenices, despite strict use of WIN32 APIs on the
+Windows build. (You can also see these using <tt><b>DUMPBIN</b></tt>.)
+</p>
+
+<p>
+The following table is my best understanding of the internal version
+number for Windows OSes back to Win95:
+</p>
+
+<blockquote>
+<table cellspacing="2" cellpadding="2" border="0">
+<tr align="left"><th>OS Name</th><th><br></th>
+                 <th>Internal Version Number</th></tr>
+<tr><td>Windows 95</td><td><br></td><td>4.0</td></tr>
+<tr><td>Windows NT 4.0</td><td><br></td><td>4.0</td></tr>
+<tr><td>Windows 98</td><td><br></td><td>4.1</td></tr>
+<tr><td>Windows Me</td><td><br></td><td>4.9</td></tr>
+<tr><td>Windows 2000</td><td><br></td><td>5.0</td></tr>
+<tr><td>Windows XP</td><td><br></td><td>5.1</td></tr>
+<tr><td>Windows XP 64-bit</td><td><br></td><td>5.2</td></tr>
+<tr><td>Windows Server 2003</td><td><br></td><td>5.2</td></tr>
+<tr><td>Windows Server 2003 R2</td><td><br></td><td>5.2</td></tr>
+<tr><td>Windows Vista</td><td><br></td><td>6.0</td></tr>
+<tr><td>Windows Server 2008</td><td><br></td><td>6.0</td></tr>
+<tr><td>Windows Server 2008 R2</td><td><br></td><td>6.1</td></tr>
+<tr><td>Windows 7</td><td><br></td><td>6.1</td></tr>
+<tr><td>Windows 8</td><td><br></td><td>6.2</td></tr>
+<tr><td>Windows Server 2012</td><td><br></td><td>6.2</td></tr>
+</table>
+</blockquote>
+
+<p>
+Reluctantly, I've concluded that different releases of the compiler produce
+binaries that require different levels of the Microsoft OS. My ancient copy
+of Visual C++ 6.0 will produce binaries going back to Windows 95. However:
+</p>
+
+<ol type="1">
+<li>VC 6.0 won't install cleanly on Windows 7</li>
+<li>VC 6.0 can't produce a 64-bit executable</li>
+</ol>
+
+<p>
+Windows XP appears to be the last version of Windows where VC 6.0 will install
+cleanly. Microsoft is desupporting XP at the end of 2013. Moreover, I really
+can't install XP on newer hardware. I've considered running a VM just to install
+XP, but the fact that it's being desupported would still be an issue. For now,
+I've installed VC 6.0 (with errors) on Windows 7, and it appears to work from
+the command line. It continues to produce 32-bit executables compatible with
+all older releases of Windows back to version 4.0.
+</p>
+
+<p>
+Now that I understand what the nature of the compatibility issue is, and
+how to diagnose it, it's time to move forward. Microsoft has stopped making
+versions of Visual Studio and the Platform SDKs available for the oldest
+platforms. So, unfortunately, I can't find a build environment that supports
+version 5.x (i.e. XP and Windows Server 2003). The oldest SDK I've found is
+for Vista. This works fine and produces 64-bit executables, but I believe
+this will require users to be running a minimum OS level equivalent to 6.0
+(i.e. Vista or Windows Server 2008).
+</p>
+
+<p>
+To save myself time and trouble, I won't bother building 32-bit versions of
+the module anymore, even with the Vista SDK.
+</p>
+
+<p>
+I can't find a 64-bit version of Apache 2.0 for Windows, so I'm unable to
+produce a binary for Apache 2.0. I have no reason to think it won't work
+though - the 32-bit build (of mod_owa 2.9.7) worked fine.
+</p>
+
+<p>
+My ancient VC 6.0 setup still works, so I'm still able to produce 32-bit
+builds if necessary. If you absolutely have to have a 32-bit build, or
+need something that runs on an older OS such as XP, you can contact me and
+at my discretion I may try to produce a build that will work for you.
+</p>
+
+</dir>
+
+</body>
+</html>

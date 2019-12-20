@@ -1,0 +1,157 @@
+<html>
+<head><title>EAPI Notes</title></head>
+<body bgcolor=#ffffff text=#000000>
+
+<h2 align="center">Apache 1.3 EAPI Notes</h2>
+<h4 align="center"><font color=#000080><i>Doug McMahon</i></font></h4>
+<h4 align="center">November 5, 2003</h4>
+
+<h4>Introduction</h4>
+<dir>
+<p>
+Several users have raised some questions about using mod_owa with mod_ssl.  In
+this note I attempt to answer the most common questions.  Note that this
+information pertains solely to Apache 1.3 (2.0 doesn't need an EAPI patch).
+</p>
+</dir>
+
+<h4>EAPI Extensions</h4>
+<dir>
+<p>
+mod_ssl depends on the so-called EAPI extensions to Apache 1.3.  These
+extensions add five callback function pointers to the standard module
+structure.  Modules can implement these functions, or set them to null
+to indicate default behavior.  mod_ssl seems to deliver these changes
+by way of a source code patch to Apache.  It changes some important
+data structures and other parts of the run-time logic, and then you
+recompile and relink httpd.
+</p>
+
+</dir>
+
+<h4>Backward Compatibility</h4>
+<dir>
+<p>
+The authors of the EAPI extensions had to ensure that a patched version of
+Apache could still load non-EAPI modules, ones that had structures that lacked
+the additional 5 function pointers.  If the code attempted to dereference
+one of these function pointers against a non-EAPI module, it would in effect
+be reading memory after the end of the (smaller) structure, reading random
+bytes from memory.  If used as a code offset, it could crash Apache (or
+worse, execute incorrect or malicious code).
+</p>
+<p>
+To get around this, they needed a way to distinguish a non-EAPI module from
+an EAPI-aware module.  The solution was to change the so-called &quot;magic
+number&quot; used by Apache to identify a module.  Whenever Apache loads
+a module structure, it looks for the magic number and, if it doesn't
+match, it gives you an error about the .so/.dll in question not looking
+like an Apache module.  An EAPI-aware Apache looks for the EAPI magic
+number, and, if it sees it, it assumes that the module in question has
+the larger structure with the necessary function pointers.  If it sees
+the original magic number, it gives you a warning about the possibility of
+crashing, but it loads the module anyway, and then makes an effort to
+avoid dereferencing the (missing) structure members.  I've not looked at
+the code, but I imagine that before every attempt to reference one of
+those structure members there is a conditional that checks to make sure
+it's OK.
+</p>
+<p>
+Note that an unfortunate side-effect of this solution is that a non-EAPI-aware
+Apache cannot similarly load an EAPI-compatible module, because it will
+look at the magic number and conclude that it's not an Apache module
+(it's unaware of the new magic number).
+</p>
+</dir>
+
+<h4>EAPI and mod_owa</h4>
+<dir>
+<p>
+mod_owa doesn't supply any implementations for the 5 new functions.  When
+compiled in the EAPI-compatible mode, mod_owa, like many modules, sets the
+values to null to get the default behavior, which is perfectly fine.  (Again,
+I've not looked at the code but I imagine that after passing the conditional
+for EAPI, the code dereferences the function pointer and only attempts to
+call it if it's non-null.)
+</p>
+<p>
+By default, I have built the mod_owa modules in a unique manner.  I build it
+with the larger EAPI structures and the extra 5 EAPI function pointers set
+to null, but I use the <b>original</b> magic number.  The result is a module
+that will load into a non-EAPI Apache, but that is theoretically safe to call
+from an EAPI Apache (because the function pointers are actually there, and
+properly nulled out).  The unpatched Apache is fine with this because it
+sees a valid magic number, and it never looks past the end of the smaller
+structure size.  It simply doesn't care that the structure is actually
+larger.  The EAPI Apache emits a warning about the module because it sees
+the original magic number, but in fact it should not run into a problem
+because, even if there are places in the code where a function pointer is
+dereferenced without being guarded by a conditional, the code should function
+properly since the memory address is valid and contains a null.
+</p>
+</dir>
+
+<h4>Eliminating the Warning</h4>
+<dir>
+<p>
+The warning is a precaution taken by the authors of the EAPI extensions;
+in fact, though, they tried to make sure that their code avoids access to the
+(presumably) missing structure members when they see an old magic
+number.  Still, the warnings make some users nervous.  If you're
+one of them, you should consider rebuilding the module to use the EAPI
+magic number.  Note that the module will not load into an unpatched
+Apache, which is why I don't build mod_owa binaries this way.  To build
+mod_owa for EAPI-only access, you need to define two compiler macros:
+</p>
+<font color="#000080"><b><dir><pre>
+-DEAPI
+-DEAPI_ONLY
+</pre></dir></b></font>
+<p>
+The first, EAPI, causes mod_owa to include the extra 5 structure elements,
+while the second, EAPI_ONLY, causes mod_owa to use the new magic number.  Using
+just the EAPI flag builds it my way, with the extra structure elements but
+with the old magic number.  Using neither of them builds it without any
+EAPI assumptions at all.  Note that, other than to suppress the warning,
+there is no difference in behavior for mod_owa, since either way mod_owa
+is accepting the default behavior for the 5 callbacks.
+</p>
+</dir>
+
+<h4>Using Unpatched Headers</h4>
+<dir>
+<p>
+Some users have attempted to rebuild the module using these flags, only to
+get errors when compiling modowa.c.  The errors are generally about invalid
+values being specified for structure initialization (or too many values
+being specified in a structure initialization).  These errors result from
+attempts to build the module for EAPI but without having valid EAPI Apache
+header files.  Many users forget that EAPI is a source-level patch to
+Apache, that modifies headers and parts of the C code.  In particular,
+two headers are relevant to mod_owa:
+</p>
+<font color="#000080"><b><dir><pre>
+src/include/ap_mmn.h
+src/include/http_config.h
+</pre></dir></b></font>
+<p>
+ap_mmn.h defines the new magic number, and http_config.h extends the module
+structure with the 5 new function pointers.  Many users have somehow gotten
+an SSL-capable Apache binary, but downloaded the base (unpatched) source
+code.  So, they do not have the EAPI header changes, and consequently,
+attempts to build mod_owa using -DEAPI will fail.
+</p>
+<p>
+If you have this problem and can't figure out how to run the patch (I've never
+been able to!) then you might take a look at my patched versions, available
+<a href="apache_eapi_headers.zip">here</a>.  I can't guarantee that they're
+correct especially since Apache sometimes changes these files from one
+release to another, but they do seem to work for me on Apache 1.3.26.  My
+suggestion is that you diff them against your versions so that you can
+see the (handful) of changes needed, and edit the headers yourself to
+incorporate them.  This is, in fact, how I did it.
+</p>
+</dir>
+
+</body>
+</html>

@@ -1,0 +1,961 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+
+<head>
+<title>Using the ORDS listener to replace modplsql</title>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<style>
+.blue     {color: #000099;}
+.black    {color: #000000;}
+.red      {color: #CC0000;}
+.green    {color: #006600;}
+.purple   {color: #660099;}
+.brown    {color: #663300;}
+.gray     {color: #333333;}
+
+.rose     {color: #993399;}
+.cyan     {color: #339999;}
+
+.bgblack  {color: #000000; background-color: #000000;}
+.bgred    {color: #000000; background-color: #CC0000;}
+.bgwhite  {color: #000000; background-color: #FFFFFF;}
+.bggray   {color: #000000; background-color: #EEEEEE;}
+.bgyellow {color: #000000; background-color: #FFFFEE;}
+.bgrose   {color: #000000; background-color: #FFEEFF;}
+.bgcyan   {color: #000000; background-color: #EEFFFF;}
+.small    {color: #000000; font-size: 80%;}
+.tiny     {color: #000000; font-size: 60%;}
+.code     {color: #000099; font-weight: bold;}
+.bold     {font-weight: bold;}
+.normal   {font-weight: normal;}
+</style>
+</head>
+
+<body>
+
+<h2 align="center">Using the ORDS listener to replace modplsql</h2>
+
+<h4 align="center" class="blue"><i>Doug McMahon</i></h4>
+
+<h4 align="center" class="red">Updated August 3, 2018</h4>
+
+<p>
+I wrote this informal how-to guide for the benefit of users who want to
+migrate off of mod_owa to the ORDS listener, as well as for users who are
+using Oracle's modplsql and facing the deprecation of that facility. These
+are just my own notes and not an official migration guide, something I'm
+hoping Oracle will produce. I had some difficulty getting things working,
+and as part of that process I looked at blog posts and discussion threads,
+and I realized that there is a general lack of knowledge about how to do
+this. I wrote this guide while using ORDS version 3.0.3.351.13.24, so be
+aware that changes to the scripted parts may have taken place since this
+was written.
+</p>
+
+<p>
+ORDS stands for <i>Oracle REST Data Services</i>. The ORDS listener is
+a Java servlet that is capable of functioning as a PL/SQL gateway
+listener. It was formerly called the Apex listener - basically it's the
+same code, extended for REST and refactored so it can be used separately
+from Apex for pure REST applications. When used as a PL/SQL gateway,
+the ORDS listener does exactly what modplsql and mod_owa do: it receives
+HTTP requests, parses the URIs and ingests other header values, and forms
+a call to a PL/SQL package/procedure to execute the request. It then
+uses the standard OWA infrastructure to receive the response, which it
+returns to the client. modplsql and mod_owa rely on an Apache server
+to handle the actual HTTP socket operations - they are <i>plug-ins</i>.
+ORDS can similarly be used within a Java Web Application Server, where
+it runs as a Java <i>servlet</i>. ORDS also comes with a built-in app
+server, Jetty, which allows it to be run in a stand-alone mode.
+</p>
+
+<h4>Concepts</h4>
+
+<dir>
+
+<p>
+Here are some conceptual things that I wish I had understood prior to trying
+to install and configure ORDS.
+</p>
+
+<dl>
+
+<dt><b>modplsql Data Access Descriptor (DAD)</b></dt>
+<dd>
+This is a basic unit of configuration in modplsql. Among other things,
+you can establish a method of connecting to your database (e.g. a username,
+password, and database connect string), as well as a URL path by which to
+execute PL/SQL commands for your application.
+</dd>
+
+<dt><b>Apache Location</b></dt>
+<dd>
+This is a basic unit of configuration in Apache and for mod_owa. With
+mod_owa, you use an Apache Location to map the OWA service to a URL within
+Apache. This is also the place where you set up your database connection
+information.
+</dd>
+
+<dt><b>ORDS &quot;database&quot;</b></dt>
+<dd>
+This seems to configure a database connection pool within ORDS. When you
+perform the <tt><b>setup --database</b></tt> command, you are configuring
+a pool of connections. This corresponds to the database half of a
+modplsql DAD or mod_owa Location.
+</dd>
+
+<dt><b>ORDS URL mapping</b></dt>
+<dd>
+This is equivalent to the URL mapping half of the modplsql DAD or mod_owa
+Location. You associate a URL mapping with your database connection.
+</dd>
+
+<dt><b>JDBC Proxy Connections</b></dt>
+<dd>
+The REST part of ORDS is able to use so-called <i>proxy</i> connections to
+the RDBMS. This allows ORDS to have a single connection pool with all the
+connections to a public user account. When a request comes in that needs to
+be run against another database user/schema, it's able to leverage one of these
+connections to proxy into the desired user/schema, run the command, and then
+exit the proxy. In this way, ORDS need not have separate connection pools
+for every possible database user/schema that has a REST service.
+</dd>
+
+</dl>
+
+<p>
+If I had understood that I needed to create both a database and a URL mapping
+in order to run my PL/SQL application, I would have saved myself a lot of
+grief! Also, it appears that while REST operations use the proxy connection
+feature, PL/SQL gateway operations don't or can't - this is another thing
+that I wish I'd understood before attempting to get ORDS running as a
+PL/SQL gateway!
+</p>
+
+</dir>
+
+<h4>Download</h4>
+
+<dir>
+
+<p>
+ORDS is delivered as a .zip file. As of this writing, you can download it
+from here: <a href="http://www.oracle.com/technetwork/developer-tools/rest-data-services/downloads/index.html">http://www.oracle.com/technetwork/developer-tools/rest-data-services/downloads/index.html</a>.
+</p>
+
+<p>
+Unzip it to a working directory. This is where you will run some installation
+and configuration steps. The unzipped image will include
+<tt><b>ords.war</b></tt>, which is the main deployable body of ORDS code
+and resources. It will also include some sub-directories, in particular
+<tt><b>params/</b></tt>. I will refer to this directory as the <u>install</u>
+directory.
+</p>
+
+<blockquote>
+<b>
+<p class="red">
+Important: make copies of ords.war and params/ords_params.properties before
+doing anything else! If you make any mistakes during the subsequent steps,
+some steps become unrepeateable and you can end up stuck. During the steps
+that follow, the ORDS setup may/will:
+</p>
+<ul type="disc" class="red">
+<li>Make modifications to resource files inside the ords.war file itself.</li>
+<li>Write out or modify files in the <i>install directory</i>, in
+particular to <tt>params/ords_params.properties</tt>.</li>
+<li>Write subdirectories and files to a <i>configuration directory</i>.</li>
+<li>Modify the state of your database.</li>
+</ul>
+<p class="red">
+Because of these changes, ORDS installation/setup steps can exhibit a
+&quot;memory effect&quot;, making it hard to correct mistakes. If need be,
+your best hope of recovery is typically to start over with the pristine
+ords.war file, params, and a completely empty configuration directory.
+</p>
+</b>
+</blockquote>
+
+<p>
+In the steps that follow you will run ORDS operations from the command line.
+You can see a list of commands this way:
+</p>
+
+<blockquote>
+<pre class="code">
+java -jar ords.war help
+</pre>
+</blockquote>
+
+<p>
+You are running Java code within the ords.war file for these commands.
+</p>
+
+</dir>
+
+<h4>Set up a configuration directory</h4>
+
+<dir>
+
+<p>
+Run an ORDS command to establish a directory on your file system where ORDS
+will store all its configuration information. I planned to eventually deploy
+my ords.war to my Tomcat server, so I created a directory under my Tomcat
+installation area:
+</p>
+
+<blockquote>
+<pre class="code">
+mkdir /usr/local/tomcat/conf/ords
+</pre>
+</blockquote>
+
+<p>
+This directory should exist prior to running the <tt><b>configdir</b></tt>
+command, which is as follows:
+</p>
+
+<blockquote>
+<pre class="code">
+java -jar ords.war configdir /usr/local/tomcat/conf/ords
+</pre>
+</blockquote>
+
+<p class="red"><b>
+Note: this command modifies the ords.war file! It is now going to look in this
+directory whenever you run commands from it. So, if you make a mistake later,
+you may end up stuck, and wondering why you can't redo something, because
+ORDS is &quot;remembering&quot; your previous mistakes. If necessary, remove
+everything from this directory and start over again with a clean, original
+copy of the <tt><b>ords.war</b></tt> file!
+</b></p>
+
+<p>
+Conceptually, this directory is the place where ORDS will store all of the
+information it needs to connect to your database and manage your URL
+mappings. That is as distinct from the installation directory, which is
+where you can run command-line actions against the <tt><b>ords.war</b></tt>
+file and where some parameters that appear to be particular to the command-line
+operations are stored. <span class="red">(It's unclear to me if
+any of the files in the install directory, particularly the file
+<tt><b>params/ords_params.properties</b></tt>, are still relevant once
+you've deployed ORDS to your web application server.)</span>
+</p>
+
+</dir>
+
+<h4>Do the initial ORDS installation</h4>
+
+<dir>
+
+<p>
+Note: you may need to run some commands in sqlplus before performing the
+ORDS installation! Please read the gotcha notes at the bottom of this
+section before doing anything else. Prior to the ORDS installation described
+here, you may need to run some sqlplus commands and/or do some non-ORDS-specific
+setup on your database.
+</p>
+
+<p>
+Note: after doing this, your <tt><b>params/ords_params.properties</b></tt>
+file will be changed, with information captured from your answers to the
+installation script. You may want to pre-edit this file prior to running
+the install - this will default some of the answers for you. In particular,
+one of the properties (the default tablespace name) is not prompted for
+in the script, and if you do not have a tablespace with the exact name
+ORDS uses (<tt><b>USERS</b></tt>), you'll get stuck. So, at least for that
+one parameter, you <strong>must</strong> edit the file in advance if you
+want an alternative. Here's what mine looked like:
+</p>
+
+<blockquote>
+<table cellspacing="2" cellpadding="0" border="0">
+<tr><td class="bgblack">
+<table cellspacing="2" cellpadding="2" border="0">
+<tbody class="bgwhite">
+<tr class="bgyellow">
+<td><pre>
+  db.hostname=dmcmahon-pc.us.oracle.com
+  db.port=1521
+  db.servicename=
+  db.sid=ORCL
+  db.username=APEX_PUBLIC_USER
+  migrate.apex.rest=false
+  rest.services.apex.add=
+  rest.services.ords.add=true
+  schema.tablespace.default=SYSAUX
+  schema.tablespace.temp=TEMP
+  standalone.http.port=8888
+  standalone.static.images=/usr/local/tomcat/webapps/ROOT/i
+  user.tablespace.default=<span class="green">USERS2</span>
+  user.tablespace.temp=TEMP
+</pre></td>
+</tr>
+</tbody>
+</table>
+</td></tr>
+</table>
+</blockquote>
+
+<p>
+You then run the installation:
+</p>
+
+<blockquote>
+<pre class="code">
+java -jar ords.war install
+</pre>
+</blockquote>
+
+<p>
+Answer the scripted questions. If you did not edit the properties file,
+you'll have to enter your database machine name, port number, and either
+the SID or service name for the database. You will need the password for
+the DBA account. At some point you'll be prompted to set up the ORDS
+public user, which will run SQL commands against your database to set
+up that account. At some point you will be prompted to set up the PL/SQL
+Gateway, or not. You want to answer <tt><b>[1]</b></tt> to set this up!
+You'll be asked to enter the password for the <tt>APEX_PUBLIC_USER</tt>. After
+this, you may answer <tt><b>[2]</b></tt> to skip setting up RESTful
+services if you don't need them. Then answer <tt><b>[2]</b></tt> to
+finish the installation.
+</p>
+
+<p class="red"><b>
+Important: possible &quot;gotcha&quot; issues!
+</b></p>
+
+<ul type="square" class="red">
+<li>
+You may need to unlock the account <tt>APEX_PUBLIC_USER</tt> from sqlplus
+before you run the ORDS installation, if this hasn't been done already!
+You'd do this from sqlplus as the DBA, with a command such as:<br>
+<dir><tt class="blue">
+alter user APEX_PUBLIC_USER identified by <i>YOUR_PASSWORD</i> account unlock;
+</tt></dir>
+</li>
+<li>
+You need to be sure that your DBA account is accessible by ORDS!
+In particular it needs to be possible to connect to it via JDBC (sqlnet),
+and it needs to have a password. This is something that tripped me up because
+my development database allows me to connect to the DBA account using OS
+authentication, e.g.:<br>
+<dir><tt class="blue">sqlplus / as sysdba</tt></dir>
+This won't work for ORDS, you need to be sure you can connect with a
+password and database name, e.g.:<br>
+<dir><tt class="blue">sqlplus sys@ORCL/manager as sysdba</tt></dir>
+</li>
+</ul>
+
+<p>
+Note that this step may or may not modify the <tt><b>ords.war</b></tt> file.
+It definitely writes data into <tt><b>params/ords_params.properties</b></tt>.
+It also definitely populates some files in the configuration directory.
+And, obviously, if you have it do the ORDS SQL setup, it modifies your
+database.
+</p>
+
+</dir>
+
+<h4>Enable ORDS for your schema</h4>
+
+<dir>
+
+<p>
+This step is extremely important for ORDS to dispatch RESTful calls to
+your application. <span class="red">(Although it's unclear if this is
+necessary for the PL/SQL gateway - still, it can't hurt.)</span>
+</p>
+
+<p>
+Log in to your database as the user/schema where your PL/SQL application
+runs from. You can use sqlplus or SQL Developer. I used the
+<tt><b>scott/tiger</b></tt> account so I logged in with:
+</p>
+
+<blockquote>
+<pre class="code">
+sqlplus scott/tiger@ORCL
+</pre>
+</blockquote>
+
+<p>
+Once connected, run this script:
+</p>
+
+<blockquote>
+<pre class="code">
+begin
+  ords.enable_schema;
+  commit;
+end;
+/
+</pre>
+</blockquote>
+
+<p>
+This registers your user/schema (in my case, <tt><b>scott</b></tt>) as a
+dispatchable account for ORDS, and, <u>critically</u>, it allows the ORDS
+public user to proxy-connect to your schema.
+</p>
+
+</dir>
+
+<h4>Set up a database (connection pool) for your application</h4>
+
+<dir>
+
+<p>
+This isn't necessary if, instead of setting up the APEX_PUBLIC_USER earlier,
+you just set up your own user/schema instead. Basically you get one database
+connection pool out-of-the-box. I kept the APEX_PUBLIC_USER as-is, so this
+meant that I needed to set up another ORDS &quot;database&quot;
+(really, connection pool) for my <tt>scott</tt> user/schema. That's
+what this step does:
+</p>
+
+<blockquote>
+<pre class="code">
+java -jar ords.war setup --database scott
+</pre>
+</blockquote>
+
+<p>
+In response to the scripted prompts, you give (or accept as defaults) the
+same machine name, listener port number, SID or service name, etc. This
+time enter <tt><b>[2]</b><tt> when prompted to skip verifying/installing
+ORDS again. Then when prompted enter <tt><b>[1]</b></tt> to use the PL/SQL
+Gateway. Here is where you can enter the username (<tt>scott</tt> in my
+case) as the gateway username, and also enter the password (which is
+<u>case-sensitive</u>, another gotcha, so I made sure to enter lower case
+&quot;tiger&quot;). Enter <tt><b>[2]</b></tt> to skip RESTful services
+again.
+</p>
+
+<p>
+The effect of this is to set up another connection pool for the
+<tt><b>scott/tiger</b></tt> user. Note that you can also use this to
+connect to other databases, although in my case the connections are to
+the same database, but just to another account. This is something I
+wish I'd understood before attempting to get ORDS running the first time.
+Also, note that while I chose to name my connection pool &quot;scott&quot;,
+I didn't have to. The name of the pool and the name of the database
+schema/user to connect to need not be the same.
+</p>
+
+<p>
+If you go to the config directory you should see an XML file for this
+pool in the <tt><b>conf</b></tt> sub-directory, e.g.
+<tt><b>conf/scott.xml</b></tt>.
+</i>
+
+<p class="red">
+There may be some way to avoid this step and have ORDS proxy over to the
+<tt>scott</tt> user, but I can't figure out how to get that to work. Since
+this is what modplsql does, I though that ORDS would work this way,
+and I wasted my time trying in vain to get my application to run
+without setting up a separate connection pool because I did not
+understand that this apparently isn't allowed except for RESTful calls.
+</p>
+
+</dir>
+
+<h4>Create a URL mapping for your application</h4>
+
+<dir>
+
+<p>
+This is part two of the two-part setup for the equivalent of a modplsql DAD.
+Here's what I did:
+</p>
+
+<blockquote>
+<pre class="code">
+java -jar ords.war map-url --type base-path /scott scott
+</pre>
+</blockquote>
+
+<p>
+What this does is create a URL mapping, which should now show up in the
+configuration directory in file <tt><b>url-mapping.xml</b></tt>. The
+trailing string &quot;scott&quot; is the name of the database connection
+pool to which this path (<tt>/scott</tt>) is bound. Once again note that
+the pool name is the one you set up in the earlier step, and need not be
+the database user/schema name.
+</p>
+
+<p class="red">
+For reasons I don't understand, it's extremely important <strong>not</strong>
+to specify an Apex workspace or database schema name at this step!
+</p>
+
+<p>
+Note that you can pick any name for the URL portion of the mapping. I
+chose <tt>/scott</tt> but I could have chosen <tt>/pls</tt> or really
+almost anything else I needed.
+</p>
+
+</dir>
+
+<h4>Switch on ORDS debugging</h4>
+
+<dir>
+
+<p>
+In the configuration directory there is a file <tt><b>defaults.xml</b></tt>
+which you can hand-edit to enable debugging. I always do this because no
+matter how careful I am, I always make some mistake, and am then frustrated
+because ORDS throws up 404 or 400 error pages with no information about what
+I did wrong. Edit the file and change these two lines from
+<span class="green">false</span> to <span class="green">true</span>:
+</p>
+
+<blockquote>
+<table cellspacing="2" cellpadding="0" border="0">
+<tr><td class="bgblack">
+<table cellspacing="2" cellpadding="2" border="0">
+<tbody class="bgwhite">
+<tr class="bgyellow">
+<td><pre>
+   &lt;entry key=&quot;debug.debugger&quot;&gt;<span class="green">true</span>&lt;/entry&gt;
+   &lt;entry key=&quot;debug.printDebugToScreen&quot;&gt;<span class="green">true</span>&lt;/entry&gt;
+</pre></td>
+</tr>
+</tbody>
+</table>
+</td></tr>
+</table>
+</blockquote>
+
+<p>
+Note that if you've done just about anything wrong, you'll get 404 or 400 error
+pages from ORDS. Even with the debugging information switched on, the pages
+contain less-than-helpful messages such as &quot;...unable to dispatch...&quot;.
+This includes little mistakes like giving the password for <tt>scott</tt>
+in upper case instead of lower case! Unfortunately it seems quite sensitive
+to minor mistakes and won't give you much of a clue as to what you've done
+wrong.
+</p>
+
+</dir>
+
+<h4>Implement the security callback</h4>
+
+<dir>
+
+<p>
+After the installation, the ORDS <tt><b>defaults.xml</b></tt> file may contain
+these lines:
+</p>
+
+<blockquote>
+<table cellspacing="2" cellpadding="0" border="0">
+<tr><td class="bgblack">
+<table cellspacing="2" cellpadding="2" border="0">
+<tbody class="bgwhite">
+<tr class="bgyellow">
+<td><pre>
+   &lt;entry key=&quot;security.requestValidationFunction&quot;&gt;<span class="green">wwv_flow_epg_include_modules.authorize</span>&lt;/entry&gt;
+   &lt;entry key=&quot;security.validationFunctionType&quot;&gt;<span class="green">plsql</span>&lt;/entry&gt;
+</pre></td>
+</tr>
+</tbody>
+</table>
+</td></tr>
+</table>
+</blockquote>
+
+<p class="red">
+Gotcha! This function almost certainly doesn't include your custom functions
+on a &quot;whitelist&quot; of allowed functions, and so you will get 403 errors
+from ORDS and you'll be wondering why. As a temporary testing measure, you can
+just comment those lines out. For production use, you'll have to investigate
+doing an actual implementation. For my test situation, I set this to call
+<tt><b>MODOWA_TEST_PKG.AUTHORIZE(PROC_NAME in varchar2)</b></tt> which returns
+TRUE for all procedures in the test package.
+</p>
+
+</dir>
+
+<h4>Test your application with ORDS in stand-alone server mode</h4>
+
+<dir>
+
+<p>
+You can run ORDS in the stand-alone mode, which runs the built-in Jetty
+application server. This is the best way to debug problems because the
+log output goes straight to your terminal window. (For example, when I
+used upper case &quot;TIGER&quot; as the password, I got messages here
+about how it was failing to start up the connection pool for
+<tt><b>scott</b></tt>, which was just about the only way I was
+told that I'd made that mistake.)
+
+<blockquote>
+<pre class="code">
+java -jar ords.war standalone
+</pre>
+</blockquote>
+
+<p>
+Note that the first time you run it, you may need to give a port number
+available on your machine. I used 8888 because 8080 (the default) is
+in use on my machine by Tomcat. It was one of the things I hand-edited
+in the <tt><b>params/ords_params.proprties</b></tt> file.
+</p>
+
+<p>
+After you run this, a new file will appear in the configuration directory,
+<tt><b>standalone/standalone.properties</b><tt>
+</p>
+
+<p>
+If all has been done properly, your PL/SQL application should now be
+accessible. I had previously installed the MODOWA_TEST_PKG to the
+<tt><b>scott</b></tt> user, and so from firefox I entered this URL:
+</p>
+
+<blockquote>
+<pre class="code">
+http://dmcmahon-pc.us.oracle.com:8888/ords/scott/modowa_test_pkg.test_plain
+</pre>
+</blockquote>
+
+<p>
+This worked! It showed me the timestamp from my database as expected!
+</p>
+
+<p class="red">
+Gotcha! Notice that the URL you use for ORDS stand-alone has an extra
+step, <tt>/ords</tt>, immediately following the host:port portion, and
+<strong>before</strong> the part I thought I had configured (<tt>/scott</tt>).
+This step appears to be &quot;hard-wired&quot; because it's the point where
+ORDS itself is mounted into the built-in JETTY listener. I wasted countless
+hours trying to figure out why I wasn't getting any response to the URL
+that just started with <tt>/scott</tt> after the host:port; ORDS doesn't
+even give an error message about the apparently unmapped URL, it just
+produces no response and writes nothing to the output logs. It may be
+that this mapping point can be renamed, but it's tricky - see below.
+</p>
+
+<p>
+You can kill ORDS with control-C (on Unix, anyway). When it's down, you
+may carefully edit the <tt><b>standalone/standalone.properties</b></tt>
+if necessary. I changed the document root property to match Tomcat's
+(though I'm not sure this was really necessary):
+</p>
+
+<blockquote>
+<table cellspacing="2" cellpadding="0" border="0">
+<tr><td class="bgblack">
+<table cellspacing="2" cellpadding="2" border="0">
+<tbody class="bgwhite">
+<tr class="bgyellow">
+<td><pre>
+standalone.doc.root=/usr/local/tomcat/webapps/ROOT
+</pre></td>
+</tr>
+</tbody>
+</table>
+</td></tr>
+</table>
+</blockquote>
+
+</dir>
+
+<h4>Deploy ORDS to your Web Application Server</h4>
+
+<dir>
+
+<p>
+The point of all the previous steps was to make sure ORDS's flat-files
+are all written to the file system correctly. Also note that several of
+the steps modified the <tt><b>ords.war</b></tt> file itself.
+</p>
+
+<p>
+I was deploying to Tomcat, which is installed on my machine at
+<tt><b>/usr/local/tomcat</b></tt>. This is why, earlier, I used
+<tt><b>/usr/local/tomcat/conf/ords</b></tt> as a configuration directory.
+I want to have my entire Tomcat setup in a single file-system tree so I
+can back it up easily, move it to another machine, etc.
+</p>
+
+<p>
+I shut down Tomcat with the usual (for Unix) command:
+</p>
+
+<blockquote>
+<pre class="code">
+/usr/local/tomcat/bin/shutdown.sh
+</pre>
+</blockquote>
+
+<p>
+I copied my <tt><b>ords.war</b></tt> file to the webapps folder:
+
+<blockquote>
+<pre class="code">
+cp ords.war /usr/local/tomcat/webapps
+</pre>
+</blockquote>
+
+<p>
+Note that the <tt><b>ords.war</b></tt> has been modified by the previous steps,
+in particular to store the location of the configuration directory. Most other
+information is now in flat-files within the configuration directory. Warning:
+the names of the sub-directories within the configuration directory appear to
+be identical to the name of the war file.
+</p>
+
+<p>
+Then I restarted Tomcat with the usual (for Unix) command:
+</p>
+
+<blockquote>
+<pre class="code">
+/usr/local/tomcat/bin/startup.sh
+</pre>
+</blockquote>
+
+<p>
+By default, Tomcat will expand the ords.war into a sub-directory with the
+same name, e.g. <tt><b>/usr/local/tomcat/webapps/ords</b></tt> on my
+machine. (In fact, it seems I can delete ords.war after the first-time use
+and it still works, because everything that was in ords.war is now expanded.)
+Tomcat will map ords to <tt><b>/ords</b></tt> in the URL space.
+</p>
+
+<p class="red">
+Gotcha: you can't change the name of ords.war to, say, apex.war, pls.war,
+or any other name at this point in order to change where the application
+server maps it - you need to have done that at an earlier step! More on
+this below, along with a possible work-around.
+</p>
+
+<p>
+Now, I can access my application with:
+</p>
+
+<blockquote>
+<pre class="code">
+http://dmcmahon-pc.us.oracle.com:8080/ords/scott/modowa_test_pkg.test_plain
+</pre>
+</blockquote>
+
+<p>
+Note that the first time access may be slow because it has to load the servlet
+and spin up the connection pools.
+</p>
+
+</dir>
+
+<h4>Changing the URL mapping point</h4>
+
+<dir>
+
+<p>
+If for some reason you need to change the mapping point, then, at least in
+Tomcat, you can rename the <tt><b>ords.war</b></tt> to the other mapping
+point before the first-time deployment and expansion. For example, you can
+change the name to <tt><b>pls.war</b></tt>. This would then mean that the
+URLs to access your application would look like this:
+</p>
+
+<blockquote>
+<pre class="code">
+http://dmcmahon-pc.us.oracle.com:8080/<span class="green"><u>pls</u></span>/scott/modowa_test_pkg.test_plain
+</pre>
+</blockquote>
+
+<p>
+If you've already expanded to <tt><b>webapps/ords</b></tt> and removed the
+war file, you can rename the directory to change the mapping point, e.g.
+change <tt><b>ords</b></tt> to <tt><b>pls</b></tt>.
+</p>
+
+<p class="red">
+The problem is, ORDS will look in the wrong places in the configuration
+directory for flat-files! I believe that to do the above properly, you
+should rename ords.war before the very first step, i.e. before running
+the <tt><b>configdir</b></tt> command. All other commands would then
+substitute your <tt><b><i>xxx</i>.war</b></tt> file where the ORDS war
+file would normally appear. I believe the issue is that ORDS uses the
+name of the servlet mapping point as the name of the sub-directory it
+looks for in the configuration directory. Because of this, it may be
+possible to rename the sub-directory to work around the problem. For
+example on my machine:
+</p>
+
+<blockquote>
+<pre class="code">
+cd /usr/local/tomcat/webapps
+mv ords.war pls.war
+
+cd /usr/local/tomcat/conf/ords
+mv ords pls
+</pre>
+</blockquote>
+
+<p>
+This worked for me, but I can't guarantee that all possible references
+(stored in the war file, stored in the xml files, etc.) are relative and
+would pivot to this change.
+</p>
+
+<p>
+For ORDS stand-alone, it does appear as if the mapping point can be changed
+by renaming, but you have to change all of the following:
+</p>
+<ul type="disc">
+<li>rename ords.war, e.g. to pls.war</li>
+<li>rename the conf directory <tt>ords</tt> subdirectory to e.g.
+<tt>pls</tt></li>, matching the new name of the .war file</li>
+<li>Edit the standalone.properties file and change the entry for
+<span class="blue">standalone.context.path</span> to e.g. <tt>pls</tt>,
+matching the new name of the .war file</li>
+</ul>
+
+<p class="red">
+One last question that I can't answer: is the file
+<tt><b>params/ords_params.properties</b></tt> still relevant after deployment?
+It seems from the usage that this file is only used when you run ORDS
+installation steps from the command line, although it also may be relevant
+when you run it in stand-alone mode.
+</p>
+
+</dir>
+
+<h4>Open questions and issues</h4>
+
+<dir>
+
+<dl>
+
+<dt><b>Database authentication</b></dt>
+<dd>
+<p>
+modplsql has the ability to do HTTP Basic authentication by connecting
+to the database as the username specified in the Basic challenge box,
+using the password given in the Basic challenge box. It could then run
+your PL/SQL request as that database user. Some modplsql and mod_owa
+customers run in this manner, with each user given a distinct database
+account. It's not clear how to make ORDS work in this manner.
+</p>
+</dd>
+
+<dt><b>Proxying connections</b></dt>
+<dd>
+<p>
+ORDS can run a single shared connection pool and, by proxying, run RESTful
+services against different schemas, provided they are configured to allow
+ORDS to proxy (as described earlier). The problem is that I can't seem to
+get ORDS to do this for PL/SQL Gateway requests. Is it even possible?
+</p>
+</dd>
+
+<dt><b>File upload/download</b></dt>
+<dd>
+<p>
+ORDS has a parameter for setting the staging table that is roughly equivalent
+to <tt><b>PlsqlDocumentTablename</b></tt>. It's <tt><b>apex.docTable</b></tt>.
+The documentation is a bit vague as to whether this would be put in
+<tt><b>defaults.xml</b></tt> (a file found in the configuration directory)
+or in one of the connection-pool files (e.g. <tt><b>conf/scott.xml</b></tt>).
+</p>
+<p>
+ORDS doesn't support an equivalent of <tt><b>PlsqlDocumentProcedure</b></tt>.
+If your application needs this feature, you'll have to work around the issue
+by coding a REST service endpoint. That's beyond the scope of this simple guide.
+A future version of ORDS will add this functionality.
+</p>
+<p class="red">
+Gotcha: ORDS looks to see if <tt><b>APEX_UTIL.FILE_UPLOAD</b></tt> is
+installed in your database. This happens at run-time. If this procedure is
+available, it's used to upload files <u>instead of the staging table</u>.
+Newer versions of Apex expect this (and mod_owa doesn't support it). If
+your legacy non-Apex application relies on a staging table, having Apex
+installed in your database will trigger this new behavior and file
+upload/download will appear not to work for your application. As a
+work-around, you might be able to hide this package by manually revoking
+execute permission on <tt><b>APEX_UTIL</b></tt> from your application's
+run-time user. For example, since I was testing as user <tt><b>SCOTT</b></tt>,
+it was sufficient for me to revoke execute on that package from user SCOTT,
+making it invisible to ORDS and causing ORDS to use the staging table instead.
+</p>
+</dd>
+
+<dt><b>Flexible argument calling conventions</b></dt>
+<dd>
+<p>
+The PL/SQL gateway has two calling conventions for flexible argument passing,
+both triggered by prepending an exclamation mark (!) ahead of the package
+and procedure name in the URL. The two-argument form passed two PL/SQL
+index-by tables of VARCHAR2 values, one with names and the other with values.
+The four-argument form passes a count of arguments, and then three index-by
+tables, one for names, one for values, and the last reserved (and unused).
+</p>
+
+<p class="red">
+Gotcha: ORDS only seems to support the 2-argument form.
+<p>
+
+<p>
+Moreover, OAS was able to automatically rewrite calls that lacked the
+required (!) prefix into flexible argument calls by doing describes on
+packages and procedures and then invoking the procedure using the flexible
+argument calling method. ORDS is not able to do this.
+</p>
+
+<p>
+The only solution is to ensure that your flexbile argument procedures use
+the 2-argument form, and that your URLs conform to the specification with
+the (!) prefix. If necessary, you can overload a procedure with a
+2-argument form that calls your existing 4-argument version using code
+such as this:
+</p>
+
+<blockquote>
+<pre class="code">
+procedure <span class="green">YOUR_FUNCTION</span>(NAME_ARRAY  in OWA.VC_ARR,
+                        VALUE_ARRAY in OWA.VC_ARR) is
+begin
+  <span class="green">YOUR_FUNCTION</span>(least(NAME_ARRAY.count(),VALUE_ARRAY.count()),
+                NAME_ARRAY, VALUE_ARRAY, VALUE_ARRAY);
+end;
+/
+</pre>
+</blockquote>
+
+<p>
+Another behavior that OAS apparently supported was parameter promotion and
+demotion. This was done by describing the procedure being called, and if
+necessary treating a single-value parameter as if it were an array of one
+value (promotion to array) or by ignoring all but the first of a multi-value
+parameter (demotion to a string). This behavior was never documented in
+modplsql. ORDS appears to handle these situations.
+</p>
+
+</dd>
+
+<dt><b>Flat-files needed after deployment</b></dt>
+<dd>
+<p>
+I'm not clear on whether any files from the install directory, particularly
+<tt><b>params/ords_params.properites</b><tt>, are used when it's deployed
+to an application server. These properties appear to be relevant whenever
+you run a command-line operation such as the installation steps above.
+But what about when running ORDS stand-alone from the command line, do they
+still matter? All the database information (for the connection pools) appears
+to be present in the files within the <i>configuration</i> directory. Even
+the ORDS stand-alone properties (such as the port number for Jetty to use)
+appear to be present in the configuration directory (in
+<tt><b>standalone/standalone.properties</b><bb>). So does the <i>install</i>
+directory matter once you've completed the installation?
+</p>
+</dd>
+
+</dl>
+
+</dir>
+
+</body>

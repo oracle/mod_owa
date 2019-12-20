@@ -1,0 +1,80 @@
+Oracle MOD_PLSQL Cartridge for Darwin/OSX
+
+John Chung - Nyquest Consulting, LLC - http://www.nyquest.com
+
+Install steps:
+
+Please note that these files have been customized for Darwin/OSX systems.
+If you want to install this on other (Linux/Windows/Unix) systems,
+please grab the required files at:
+
+  https://oss.oracle.com/projects/mod_owa/dist/documentation/modowa.htm
+
+1. Before doing anything, make sure that you have X-code installed and that
+   you can at least compile and link.
+
+2. Prior to compiling this module, also make sure you have Apache HTTP
+   installed and working. The newer version of Apache has quite a few
+   dependencies (such as apr, apr-util and pcre). Be sure to build http
+   with module support (ie. run ./configure --enable-so). Once you
+   compile/install apache, verify that the server starts correctly and that
+   you can connect. You can get the latest sources from http://www.apache.org
+
+3. Download the Oracle instant client for OSX (http://technet.oracle.com).
+   Make sure you get the 64-bit builds if you are running OSX on intel.
+   In theory the 32 bit PPC builds should work if you are running Darwin
+   on PPC, but this has not been tested. Install the client to some directory,
+   edit tnsnames.ora to create the database connect strings, and verify you can
+   connect to the target database using SQL*PLUS.
+
+4. Unpack the source to a staging directory. Copy the osx.mk make file
+   from the sample makefiles and edit it if necessary for your installation.
+
+5. Edit osx.mk and change the ORACLE_HOME, APR_ROOT, and APACHE_TOP variables
+   to values matching your installation.
+
+6. Run make -kf osx.mk. You should have a mod_owa.so file in your directory now.
+
+7. Copy the mod_owa.so file to the $APACHE_TOP/modules directory.
+
+8. Edit the $APACHE_TOP/conf/httpd.conf and add the following lines to load
+   the mod_owa.so module and include a dads.conf file to define the database
+   access descriptors:
+
+   LoadModule owa_module modules/mod_owa.so
+   Include conf/dads.conf
+
+9. Edit dads.conf and add the following block for each virtual directory that
+   you want to access. In the example here I'm adding a block for the virtual
+   directory called "/seed"
+   
+   <Location /seed>
+    #AllowOverride  None
+    Options        None
+    SetHandler     owa_handler
+    OwaUserid      scott/tiger@SEED
+    OwaNLS         AMERICAN_AMERICA.AL32UTF8
+    #OwaAuth        OWA_INIT
+    OwaDiag        COMMAND ARGS CGIENV POOL SQL MEMORY
+    OwaLog         "/usr/local/apache2/logs/mod_owa.log"
+    OwaPool        20
+    OwaStart       "doc_pkg.homepage"
+    OwaDocProc     "doc_pkg.readfile"
+    OwaDocPath     docs
+    OwaUploadMax   10M
+    OwaCharset     "iso-8859-1"
+    order          deny,allow
+    allow          from all
+   </Location>
+
+10. Test the DAD. From SQP*PLUS, and within the OwaUserid schema, create
+    the following procedure:
+
+      create or replace procedure OWA_TEST is
+      begin
+        HTP.PRINT('hello world');
+      end;
+      /
+
+    then point a browser to http://your.website/seed/owa_test.
+    If all is working you should see a "hello world" prompt.

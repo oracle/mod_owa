@@ -1,0 +1,470 @@
+<html>
+<head><title>PL/SQL Gateway Servlet</title></head>
+<body bgcolor="white" text="black">
+
+<center>
+<h1>PL/SQL Gateway Servlet</h1>
+<h4><font color="#000080"><i>Doug McMahon</i>
+<br>(dmcmahon@us.oracle.com)</font></h4>
+<h4><font color="#c00000">August 12, 2000</font></h4>
+</center>
+
+<hr size="5" noshade width="50%" align="center">
+
+<h4>Introduction</h4>
+
+<dir>
+
+<p>
+This is an experimental Java servlet implementation of PL/SQL gateway
+functionality.  This code is provided primarily for education and
+for use at your own risk.
+</p>
+
+</dir>
+
+<h4>Installation and Setup</h4>
+
+<dir>
+
+<p>
+To run this code, you must first have installed the Oracle OWA itself in
+your target database, and you must have installed a servlet execution
+environment (such as TomCat).  If you plan to run under Apache, you will
+need to have the Jserv module installed.
+</p>
+
+<p>
+The code was built and tested with JDK 1.3.1 and the TomCat servlet runner
+running under Apache.  It was built using the Oracle 8.1.6 JDBC drivers for
+Java 1.2 on NT, and also tested on Linux.  It should also work with
+JDK 1.1.8 and other servlet runners (such as the runner that comes with
+mod_jserv), but I haven't tested these cases.  If you plan make any
+change in the deployment environment, but especially a platform other
+than NT, a JDK 1.1.8 environment, or a different version of Oracle or
+the JDBC driver set, I would strongly recommend recompiling the classes.
+</p>
+
+<p>
+The following classes are included:
+</p>
+
+<ul type="disc">
+<li><strong>Owa</strong> - The servlet that handles the HTTP parts of
+OWA operations.</li>
+<li><strong>GatewayManager</strong> - A class that manages all interactions
+with PL/SQL.</li>
+<li><strong>ConnectionPool</strong> - A singleton class that maintains a
+pool of JDBC connections.</li>
+</ul>
+
+<p>
+To install this code, you need to place all of the .class files on the
+CLASSPATH of your servlet runner.  You can simply copy the files to
+a directory that's already on the path, or zip up the files into a file
+(e.g. owaj.zip) and place this file on the CLASSPATH.  On my system,
+I deploy the .class files directly in the target area, e.g.
+<tt><b><font color="#000080">/tomcat/webapps/examples/WEB-INF/classes</font></b></tt>).
+</p>
+
+<p>
+If you want to run any of the test packages, you can install the
+SQL scripts provided with mod_owa and then put the test file
+<tt><b><font color="#000080">owajtest.htm</font></b></tt> in the
+root web page directory for your web server (e.g. /htdocs for Apache,
+/webpages/ROOT/ for TomCat).
+</p>
+
+<p>
+Even if you don't want the test code, you will need one SQL object that
+is not (yet) part of the OWA.  I've reproduced it here in case you just
+want to create it from SQL*Plus and ignore the test scripts:
+</p>
+
+<font color="#000080"><b><dir><pre>
+create or replace type OWA_ARRAY as table of VARCHAR2(32767);
+/
+</pre></dir></b></font>
+
+<p>
+That's pretty much it for the basic installation.  You still need to do
+the following:
+</p>
+
+<ul type="disc">
+<li>Configure the Owa servlet (setting servlet initialization parameters)</li>
+<li>Change your target PL/SQL code (because of JDBC limitations)</li>
+</ul>
+
+</dir>
+
+<h4>Configuring the Owa Servlet</h4>
+<dir>
+
+<p>
+There are two main things you need to do to configure a servlet:
+</p>
+
+<ol type=1>
+<li>map the servlet class name to a URL name, and</li>
+<li>set the values for servlet parameters.</li>
+</ol>
+
+<p>
+The mechanism for doing these things depends on your servlet runner.  For
+TomCat, the servlet environment I used for development, the configuration is
+done in a file called <tt><b><font color="#000080">web.xml</font></b></tt>,
+typically found under a directory called WEB-INF (for instance, the file
+<tt><b><font color="#000080">/tomcat/webapps/examples/WEB-INF/web.xml</font></b></tt>)
+controls servlets that execute underneath &quot;examples&quot;.
+</p>
+
+<p>
+The Owa servlet is configured using standard servlet parameters.  It
+understands the following:
+</p>
+
+<dir>
+<table cellspacing="0" cellpadding="0" border="0" width="80%">
+<tr valign="top">
+  <td><strong>Parameter</strong></td><td>&nbsp;&nbsp;</td>
+  <td><strong>Example</strong></td><td>&nbsp;&nbsp;</td>
+  <td><strong>Description</strong></td></tr>
+<tr valign="top" bgcolor="#80c0ff">
+  <td>database</td><td>&nbsp;&nbsp;</td>
+  <td>localhost:1521:ORCL</td><td>&nbsp;&nbsp;</td>
+  <td>Connection information in the form host:port:SID.  This
+parameter is required, but defaults to localhost:1521:ORCL</td></tr>
+<tr valign="top" bgcolor="#c0e0ff">
+  <td>dbusername</td><td>&nbsp;&nbsp;</td>
+  <td>scott</td><td>&nbsp;&nbsp;</td>
+  <td>Database username.  This parameter is required, and has no default.  The
+servlet will issue an error message if this isn't set.</td></tr>
+<tr valign="top" bgcolor="#80c0ff">
+  <td>dbpassword</td><td>&nbsp;&nbsp;</td>
+  <td>tiger</td><td>&nbsp;&nbsp;</td>
+  <td>Database password.  This parameter is required, and has no default.  The
+servlet will issue an error message if this isn't set.</td></tr>
+<tr valign="top" bgcolor="#c0e0ff">
+  <td>document_path</td><td>&nbsp;&nbsp;</td>
+  <td>docs</td><td>&nbsp;&nbsp;</td>
+  <td>URL prefix for document reads.</td></tr>
+<tr valign="top" bgcolor="#80c0ff">
+  <td>document_proc</td><td>&nbsp;&nbsp;</td>
+  <td>mypackage.readfile</td><td>&nbsp;&nbsp;</td>
+  <td>Name of document download procedure.</td></tr>
+<tr valign="top" bgcolor="#c0e0ff">
+  <td>default_page</td><td>&nbsp;&nbsp;</td>
+  <td>mypackage.showpage</td><td>&nbsp;&nbsp;</td>
+  <td>Procedure to run for default page (when no script is present in the
+URL.</td></tr>
+<tr valign="top" bgcolor="#80c0ff">
+  <td>pool_size</td><td>&nbsp;&nbsp;</td>
+  <td>10</td><td>&nbsp;&nbsp;</td>
+  <td>Number of connections to save in the connection pool.  The default is
+10, the maximum is 100.</td></tr>
+<tr valign="top" bgcolor="#c0e0ff">
+  <td>auth_mode</td><td>&nbsp;&nbsp;</td>
+  <td>PACKAGE</td><td>&nbsp;&nbsp;</td>
+  <td>Specifies the PL/SQL authorization mode.  Valid values are
+OWA_INIT, OWA_CUSTOM, and PACKAGE.  The default is no aut</td></tr>
+<tr valign="top" bgcolor="#80c0ff">
+  <td>alternate_owa</td><td>&nbsp;&nbsp;</td>
+  <td>MY_OWA</td><td>&nbsp;&nbsp;</td>
+  <td>Optional name of a package that implements an alternative to the
+OWA.  Changes the prefix used before INIT_CGI_ENV, GET_PAGE, and
+AUTHORIZE.</td></tr>
+<tr valign="top" bgcolor="#c0e0ff">
+  <td>dad_charset</td><td>&nbsp;&nbsp;</td>
+  <td>iso-8859-1</td><td>&nbsp;&nbsp;</td>
+  <td>Specifies the character set to use for content transfers.  The
+default is &quot;iso-8859-1&quot;.  The only other value supported at
+the moment is &quot;utf-8&quot;.</td></tr>
+</table>
+</dir>
+
+<p>
+Here's an example of the relevant portion of a web.xml file for TomCat:
+</p>
+<font color="#000080"><b><dir><pre>
+&lt;servlet&gt;
+  &lt;servlet-name&gt;owa&lt;/servlet-name&gt;
+  &lt;servlet-class&gt;Owa&lt;/servlet-class&gt;
+  &lt;init-param&gt;
+    &lt;param-name&gt;database&lt;/param-name&gt;
+    &lt;param-value&gt;localhost:1521:ORCL&lt;/param-value&gt;
+  &lt;/init-param&gt;
+  &lt;init-param&gt;
+    &lt;param-name&gt;dbusername&lt;/param-name&gt;
+    &lt;param-value&gt;scott&lt;/param-value&gt;
+  &lt;/init-param&gt;
+  &lt;init-param&gt;
+    &lt;param-name&gt;dbpassword&lt;/param-name&gt;
+    &lt;param-value&gt;tiger&lt;/param-value&gt;
+  &lt;/init-param&gt;
+  &lt;init-param&gt;
+    &lt;param-name&gt;dbpassword&lt;/param-name&gt;
+    &lt;param-value&gt;owa&lt;/param-value&gt;
+  &lt;/init-param&gt;
+&lt;/servlet&gt;
+&lt;servlet-mapping&gt;
+  &lt;servlet-name&gt;owa&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;/owa/*&lt;/url-pattern&gt;
+&lt;/servlet-mapping&gt;
+</pre></dir></b></font>
+
+<p>
+Note particularly the mapping of the Owa class to a servlet short name
+(&quot;owa&quot;), and the mapping of the servlet short name to a URI
+pattern match (&quot;/owa/*&quot;).  Also note the method for setting
+parameters as name/value pairs.  If this appears in the web.xml file
+under /webapps/examples/WEB-INF/, this enables URLs of the form
+</p>
+
+<font color="#000080"><b><dir><pre>
+http://localhost/examples/owa
+</pre></dir></b></font>
+
+<p>
+to be directed into the Owa servlet.
+</p>
+
+<p><font color="#c00000"><i><b>
+The exact method of configuration will depend on your servlet execution
+environment.</b></i></font></p>
+
+</dir>
+
+<h4>PL/SQL Operation</h4>
+
+<dir>
+
+<p>
+In this discussion I'm assuming you're somewhat familiar with the operation
+of mod_owa, as described in <a href="modowa.htm">modowa.htm</a>.
+<p>
+
+<p>
+The operation of the servlet is largely the same as mod_owa.  The main
+difference (aside from functionality not yet implemented) is that you
+no longer have an Apache &quot;Location&quot; where the owa functionality
+is accessed.  Instead, you have the Owa servlet itself as a virtual
+location.  For example, on my system running TomCat's Jserv under
+Apache, the following path takes me to the Owa servlet:
+</p>
+
+<font color="#000080"><b><dir><pre>
+http://localhost/examples/owa
+</pre></dir></b></font>
+
+<p>
+Commands to the servlet then follow this in the URL in a manner identical
+to that for mod_owa, e.g.
+</p>
+
+<font color="#000080"><b><dir><pre>
+http://mymachine/examples/owa/foobar?a=dog&amp;b=cat
+</pre></dir></b></font>
+
+<p>
+Most of the core functionality of mod_owa is there, though some of it may
+require changes to your PL/SQL code (described in the next section)
+because of limitations in the way the JDBC drivers handle collection
+arguments.  There may be character-set issues, especially with file
+upload operations; I don't understand the Java binary/string conversion
+interfaces very well yet.  <font color="#c00000"><i>This code hasn't been
+updated for almost a year, so at this time there are many mod_owa features
+that it doesn't implement.</i></font>
+</p>
+
+</dir>
+
+<h4>PL/SQL Issues</h4>
+
+<dir>
+
+<p>
+The Owa servlet should work identically for the normal case of a procedure
+with named scalar argument bindings.  However, there are issues with the
+positional argument mode, and PL/SQL code changes required for interfaces
+that involve PL/SQL table-of-string (collection) arguments.  There are
+some other limitations as well, primarily with respect to the document
+upload/download interfaces.  All of these are described below.
+</p>
+
+<dl>
+<dt><u>Collections</u></dt>
+<dd>
+<p>
+The biggest single problem with collections is that the JDBC drivers lack
+a means of binding them to PL/SQL table-of-string types, which are commonly
+used in both the OWA interfaces and in many user programs.  It is possible
+to work around this problem by using the OWA_ARRAY type to pass the
+collections to PL/SQL, then transcribing the contents to a PL/SQL table of
+the appropriate type.  In theory, the servlet could do this for any
+procedure call by simply generating the necessary transfer code as part
+of the anonymous block it builds to call the procedure.  In fact it does
+exactly this to enable it to call the INIT_CGI_ENV and GET_PAGE functions.
+</p>
+<p>
+Unfortunately the servlet can do that only if it knows the PL/SQL table
+type in advance, which it cannot know for user-written code.  The
+suggested work-around is to add a &quot;wrapper&quot; procedure to
+the user package by overloading the interface name with a variant that
+accepts OWA_ARRAY arguments as inputs and contains the necessary transfer
+logic.  For example, to call this procedure:
+</p>
+<font color="#000080"><b><dir><pre>
+procedure TEST_ARRAY(N in number, A in VCTAB);
+</pre></dir></b></font>
+<p>add this code to the package:</p>
+<font color="#000080"><b><dir><pre>
+procedure TEST_ARRAY(N in number, A in OWA_ARRAY) is
+  A_NEW VCTAB;
+begin
+  for I in 1..N loop
+    A_NEW(I) := A(I);
+  end loop;
+  TEST_ARRAY(N, A_NEW);
+end TEST_ARRAY;
+</pre></dir></b></font>
+</dd>
+<dt><u>Positional Arguments</u></dt>
+<dd>
+<p>
+Unfortunately, the standard servlet infrastructure for parsing GET query
+strings and POST parameters return a Java Hashtable object to the Owa
+servlet.  This is unfortunate because the information about the exact
+order in which the arguments were encountered is effectively lost.  It
+could be a serious problem for a call in positional mode, and it could
+affect procedures called in the flexible argument mode where there is
+an assumption about the argument order in the arrays.
+</p>
+<p>
+The Owa servlet works around this problem by doing its own parse of the
+argument string and returning an ordered collection (a Vector).  It
+then attempts to merge the unescaped argument values from the Hashtable.  I
+believe it all works correctly but haven't exhaustively tested it.
+</p>
+</dd>
+<dt><u>LOBs</u></dt>
+<dd>
+<p>
+NCHAR-based LOBs don't seem to be supported in the JDBC, so I was
+unable to generate a valid binding.  Thus, besides the change to OWA_ARRAY
+types for the collections, the file read and write interfaces have one
+fewer argument under this servlet.
+</p>
+<p>
+Because BFILEs follow NCLOBs in the argument order for mod_owa, I didn't
+bother implementing BFILE support, either.
+</p>
+<p>
+Finally, because the foregoing omissions now mean that the only two LOB
+types supported by the servlet are the BLOB and the CLOB, I didn't bother
+adding a parameter to support variation in the LOB calling mode for document
+uploads and downloads; the servlet always calls with both the BLOB and CLOB
+handles, expecting one of these to be non-null on return.
+</p>
+</dd>
+<dt><u>LONG and LONG RAW</u></dt>
+<dd>
+<p>
+I did not bother to implement the legacy LONG and LONG RAW file
+operations, because the JDBC doesn't seem to have streaming support for
+them.
+</p>
+</dd>
+<dt><u>PACKAGE Authorization</u></dt>
+<dd>
+<p>
+This is implemented, but to keep the code simple I didn't bother
+allowing you to set both PACKAGE and one of OWA_INIT/OWA_CUSTOM.  I
+reasoned that this was unlikely to matter to most users, since when
+PACKAGE is specified for mod_owa, the only use for OWA_INIT/OWA_CUSTOM
+is when a bare procedure is being called.  In this situation the
+servlet uses the newer OWA_CUSTOM.  If this matters to you, be sure
+you have the most recent OWA, or create a synonym from OWA_CUSTOM to
+OWA_INIT.
+</p>
+</dd>
+<dt><u>OWA Alternative Package</u></dt>
+<dd>
+<p>
+The implementation is incomplete versus the spec from mod_owa.  The
+servlet will use the package name you specify as a replacement for
+the calls to INIT_CGI_ENV, GET_PAGE, and AUTHORIZE (when PACKAGE
+is not specified).  However, if the OWA is overridden, the servlet
+version runs exclusively a mode that is the equivalent setting KEEPSTATE
+and WITHRAW, the call appearing as follows:
+</p>
+<font color="#000080"><b><dir><pre>
+begin &lt;package_name&gt;.GET_PAGE(:cbuffer, :rbuffer, :moredata); end;
+</pre></dir></b></font>
+<p>
+It doesn't yet support the normal GET_PAGE mode, nor does it support the
+LOB-based content return interface (USELOBS).  It also doesn't give you
+control over the suppression of RESET_PACKAGE; if you override the
+default OWA, the servlet will always omit the call to RESET_PACKAGE.
+</p>
+</dd>
+<dt><u>File System Caching</u></dt>
+<dd>
+<p>
+None of this is supported by the servlet implementation.
+</p>
+</dd>
+<dt><u>Describe</u></dt>
+<dd>
+<p>
+None of the describe modes are supported because there's no OCIDescribeAny()
+in the JDBC interfaces.
+</p>
+</dd>
+<dt><u>Reset Package Modes</u></dt>
+<dd>
+<p>
+These aren't supported, but would be easy (and important) to add.
+</p>
+</dd>
+<dt><u>Before/After Procedures</u></dt>
+<dd>
+<p>
+These haven't been implemented, but would be easy to add.  Also, the
+forced replacement procedure (OwaProc) isn't supported, but could be.
+</p>
+</dd>
+<dt><u>Unicode binding modes</u></dt>
+<dd>
+<p>
+These can be implemented only with the release of the Oracle 9i JDBC
+drivers, which add support for NCHAR/NVARCHAR bindings.
+</p>
+</dd>
+<dt><u>Security</u></dt>
+<dd>
+<p>
+None of the Basic authentication support is available, nor are the
+OAS-compatible settings.  The ability to use native database logins is
+also not supported.  All of this could be added (with considerable effort).
+</p>
+</dd>
+<dt><u>Chunking of large flexible arguments</u></dt>
+<dd>
+<p>
+This hasn't been implemented yet.
+</p>
+</dd>
+<dt><u>Date Formats and Time Zones</u></dt>
+<dd>
+<p>
+These features were added to mod_owa for Oracle 9i and haven't been
+implemented yet.
+</p>
+</dd>
+</dl>
+
+</dir>
+
+</body>
+</html>
