@@ -80,6 +80,7 @@
 ** 04/27/2014   D. McMahon      Zero init temporary connection hdb
 ** 09/11/2015   D. McMahon      Disallow control characters in headers
 ** 10/13/2015   D. McMahon      Limit CGIPOST buffer to 32k (per Fulvio Bille)
+** 05/29/2020   D. McMahon      Initialize some variables just in case
 */
 
 #define WITH_OCI
@@ -825,7 +826,7 @@ static void owa_render_xml(owa_context *octx, request_rec *r,
 static int owa_getrows(connection *c, owa_context *octx, request_rec *r,
                        char *outbuf, char *xtags, int cs_expand, int mode)
 {
-    sword status;
+    sword status = OCI_SUCCESS;
     sword cstatus;
     ub4   ncolumns = 0;
     ub4   n;
@@ -1373,9 +1374,9 @@ int owa_getpage(connection *c, owa_context *octx, request_rec *r,
     ub2      loglens[HTBUF_ARRAY_SIZE];
     char     xtags[HTBUF_HEADER_MAX + 1];
     char    *logbuffer = (char *)0;
-    ub4      logasize;
-    ub4      logwidth;
-    ub4      logamax;
+    ub4      logasize = 0;
+    ub4      logwidth = 0;
+    ub4      logamax = 0;
     sb4      logecount;
     int      cs_expand = 1;
     int      rset_mode = 0;
