@@ -123,6 +123,7 @@
 ** 08/20/2018   D. McMahon      Reclassify PATCH as a REST method
 ** 10/18/2018   D. McMahon      Add DAD_NAME to the CGI environment
 ** 10/22/2018   D. McMahon      Set PATH_INFO for OwaStart
+** 05/29/2020   D. McMahon      Fix a serious bug in array resizing
 */
 
 #define WITH_OCI
@@ -2266,11 +2267,11 @@ static int collect_args(request_rec *r, int *nargs, file_arg *filelist,
         /* Otherwise, resize the collection if necessary */
         if ((param_count[j] & (HTBUF_PARAM_CHUNK-1)) == 0)
         {
-            i = param_count[j];
+            int nz = param_count[j];
             param_array[j] = (char **)resize_arr(r, (void *)param_array[j],
-                                                 sizeof(char *), i);
-            i += HTBUF_PARAM_CHUNK;
-            if (!param_array[j]) return(-((int)(i * sizeof(char *))));
+                                                 sizeof(char *), nz);
+            nz += HTBUF_PARAM_CHUNK;
+            if (!param_array[j]) return(-((int)(nz * sizeof(char *))));
         }
         /* Move the duplicate value into the collection */
         param_array[j][param_count[j]++] = param_value[i];
@@ -3585,15 +3586,16 @@ checkflex:
                 if (!param_array[n]) return(mem_error(r, m, diagflag));
                 param_array[n][0] = param_value[n];
                 param_value[n] = (char *)0;
+                param_count[n] = 1;
             }
             if ((param_count[n] & (HTBUF_PARAM_CHUNK-1)) == 0)
             {
-                i = param_count[n];
+                int nz = param_count[n];
                 param_array[n] = (char **)resize_arr(r, (void *)param_array[n],
-                                                     sizeof(char *), i);
-                i += HTBUF_PARAM_CHUNK;
+                                                     sizeof(char *), nz);
+                nz += HTBUF_PARAM_CHUNK;
                 if (!param_array[n])
-                  return(mem_error(r, i * sizeof(char *), diagflag));
+                  return(mem_error(r, nz * sizeof(char *), diagflag));
             }
             param_array[n][param_count[n]++] = aptr;
         }
