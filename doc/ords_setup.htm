@@ -423,7 +423,7 @@ java -jar ords.war setup --database scott
 <p>
 In response to the scripted prompts, you give (or accept as defaults) the
 same machine name, listener port number, SID or service name, etc. This
-time enter <tt><b>[2]</b><tt> when prompted to skip verifying/installing
+time enter <tt><b>[2]</b></tt> when prompted to skip verifying/installing
 ORDS again. Then when prompted enter <tt><b>[1]</b></tt> to use the PL/SQL
 Gateway. Here is where you can enter the username (<tt>scott</tt> in my
 case) as the gateway username, and also enter the password (which is
@@ -605,7 +605,7 @@ in the <tt><b>params/ords_params.proprties</b></tt> file.
 
 <p>
 After you run this, a new file will appear in the configuration directory,
-<tt><b>standalone/standalone.properties</b><tt>
+<tt><b>standalone/standalone.properties</b></tt>
 </p>
 
 <p>
@@ -941,7 +941,7 @@ modplsql. ORDS appears to handle these situations.
 <dd>
 <p>
 I'm not clear on whether any files from the install directory, particularly
-<tt><b>params/ords_params.properites</b><tt>, are used when it's deployed
+<tt><b>params/ords_params.properites</b></tt>, are used when it's deployed
 to an application server. These properties appear to be relevant whenever
 you run a command-line operation such as the installation steps above.
 But what about when running ORDS stand-alone from the command line, do they
