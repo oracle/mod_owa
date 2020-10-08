@@ -108,6 +108,7 @@
 ** 06/06/2013   D. McMahon      Add util_json_escape
 ** 06/21/2013   D. McMahon      Add util_csv_escape
 ** 09/19/2013   D. McMahon      Add str_ltoa
+** 10/07/2020   D. McMahon      New mime types
 */
 
 #include <modowa.h>
@@ -622,6 +623,11 @@ static const char mime_list[] =
 "[image/bmp]"                       " bmp "
 "[image/x-icon]"                    " ico "
 "[image/svg+xml]"                   " svg "
+"[application/x-bzip]"              " bz "
+"[application/x-bzip2]"             " bz2 "
+"[application/x-7z-compressed]"     " 7z "
+"[application/java-archive]"        " jar "
+"[application/vnd.amazon.ebook]"    " azw "
 "[application/x-shockwave-flash]"   " swf "
 "[application/msword]"              " doc "
 "[application/vnd.ms-excel]"        " xls "
@@ -632,6 +638,13 @@ static const char mime_list[] =
 "[application/x-gunzip]"            " gz "
 "[application/zip]"                 " zip "
 "[application/x-tar]"               " tar "
+"[application/vnd.openxmlformats-officedocument.presentationml.presentation]"
+                                    " pptx "
+"[application/vnd.openxmlformats-officedocument.wordprocessingml.document]"
+                                    " docx "
+"[application/vnd.ms-fontobject]"   " eot "
+"[application/epub+zip]"            " epub "
+"[audio/aac]"                       " aac "
 "[audio/x-wav]"                     " wav "
 "[audio/mpeg]"                      " mpga mp2 mp3 "
 "[audio/basic]"                     " au snd "
@@ -644,6 +657,7 @@ static const char mime_list[] =
 "[video/mpeg]"                      " mpeg mpg mpe "
 "[video/quicktime]"                 " qt mov "
 "[video/vnd.mpegurl]"               " mxu m4u "
+"[text/javascript]"                 " mjs "
 "[text/richtext]"                   " rtx "
 "[text/rtf]"                        " rtf "
 "[text/sgml]"                       " sgml sgm "

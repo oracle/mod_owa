@@ -1436,7 +1436,7 @@ sword sql_define_lob(connection *c, OraCursor stmhp, ub4 pos, ub2 flag)
     {
 #ifdef NEVER
         /* ### cs_id NOT USED FOR LOB BINDINGS -- ELIMINATE THIS CODE? ### */
-        status = OCIAttrSet(bhand, (ub4)OCI_HTYPE_BIND, &cs_id, (ub4)0,
+        status = OCIAttrSet(dhand, (ub4)OCI_HTYPE_BIND, &cs_id, (ub4)0,
                             (ub4)OCI_ATTR_CHARSET_ID, c->errhp);
 #endif
     }
