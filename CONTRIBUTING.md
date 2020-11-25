@@ -1,16 +1,16 @@
-Contributing
+## Contributing
 
 We welcome your contributions! There are multiple ways to contribute.
 
-Issues
+## Issues
 
 For bugs or enhancement requests, please file a GitHub issue unless it's
 security related. When filing a bug remember that the better written the
 bug is, the more likely it is to be fixed. If you think you've found a
 security vulnerability, do not raise a GitHub issue and follow the
-instructions on our Security Policy.
+instructions on our [Security Policy] (https://linux-git.us.oracle.com/ogho/template-repo/blob/master/SECURITY.md)
 
-Contributing Code
+## Contributing Code
 
 We welcome your code contributions. To get started, you will need to sign
 the Oracle Contributor Agreement (OCA).
@@ -27,7 +27,7 @@ git commit --signoff
 Only pull requests from committers that can be verified as having
 signed the OCA can be accepted.
 
-Pull request process
+## Pull request process
 
 Fork this repository
 
@@ -43,7 +43,7 @@ what your changes are meant to do and provide simple steps on how to validate
 your changes. Ensure that you reference the issue you created as well.
 We will assign the pull request to 1 person for review before it is merged.
 
-Code of Conduct
+## Code of Conduct
 
 Follow the Golden Rule. If you'd like more specific guidelines see the
 Contributor Covenant Code of Conduct.

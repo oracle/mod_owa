@@ -1,29 +1,32 @@
-About mod_owa
+## About mod_owa
 
 This is a demonstration of Oracle's PL/SQL gateway for Apache using
 OCI8 technology. It doesn't fully replace modplsql. ORDS is the
 modplsql replacement technology.
 
-Installation
+## Installation
 
 Build the module from source code as explained in the documentation.
-Configure Apache to call the module with a modowa.conf file and include
-this in your httpd.conf.
+Configure Apache to call the module as explained in the documentation.
 
-Documentation
+## Documentation
 
-modowa.htm
+The original documentation is here in both HTML form
+[modowa.htm] (doc/modowa.htm) and plaintext [modowa.txt] (doc/modowa.txt).
 
-Examples
+## Examples
 
-None.
+Please see the documentation for the PL/SQL Gateway.
 
-Help
+## Help
 
-<Instructions on where to get help go here>
+For questions or problems, you can contact the module author,
+[Doug McMahon] (mailto:doug.mcmahon@oracle.com).
 
-Contributing
+## Contributing
 
+See CONTRIBUTING for details.
 
-Security
+## Security
+
 See SECURITY for details.
