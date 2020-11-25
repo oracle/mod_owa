@@ -100,7 +100,6 @@
 ** 09/11/2015   D. McMahon      Add nls_sanitize_header and nls_copy_identifier
 ** 09/09/2015   D. McMahon      GBK is reclassified as non-byte-unique
 ** 03/08/2018   D. McMahon      Added WE8ISO8859P15 (latin-9)
-** 05/29/2020   D. McMahon      Treat unknown SJIS bytes as single-byte
 */
 
 #include <modowa.h>
@@ -681,16 +680,15 @@ int nls_count_chars(int cs_id, char *outbuf, un_long *nbytes)
                 ** is a discrepancy between the documentation and experiment.
                 ** Documentation:
                 **
-                **   Range      ZHT32EUC   ZHT32TRIS  ZHT32SOPS  Implementation
-                **   ----------------------------------------------------------
-                **   0x80-0x8d  undefined  undefined  2?         2-byte
+                **   Range      ZHT32EUC   ZHT32TRIS  ZHT32SOPS  CNS1164386
+                **   ------------------------------------------------------
+                **   0x80-0x8d  undefined  undefined  2?         2?
                 **   0x8e       4-byte     4-byte     4-byte     4-byte
-                **   0x8f-0xa0  undefined  undefined  2?         2-byte
-                **   0xa1-0xfd  2-byte     undefined  2?         2-byte
-                **   0xfe-0xff  undefined  undefined  2?         2-byte
+                **   0x8f-0xa0  undefined  undefined  2?         2?
+                **   0xa1-0xfd  2-byte     undefined  2?         2?
+                **   0xfe-0xff  undefined  undefined  2?         2?
                 **
                 ** The implementation maps all undefined values to 2.
-                ** ### For ZHT32TRIS, undefined bytes should be 1.
                 */
                 if ((k == 0x8E) && (cs_id == ZHT32EUC_CSID))
                     n = 4;
@@ -719,14 +717,10 @@ int nls_count_chars(int cs_id, char *outbuf, un_long *nbytes)
                 **
                 ** Plus, the algorithm can be used for:
                 **   KO16KSCCS (although 80-83 and fa-ff are undefined)
-                **
-                ** ZHS32GB18030 uses a second-byte signalling mechanism
-                ** and can therefore be treated as if it were a 2-byte set.
                 */
                 else if (((k == 0x80) || (k == 0xFF)) &&
                          ((cs_id == BIG5_CSID) ||
-                          (cs_id == GBK_CSID)  ||
-                          (cs_id == GB2312_CSID)))
+                          (cs_id == GBK_CSID) || (cs_id == GB2312_CSID)))
                     n = 1;
                 /*
                 ** All forms of Shift-JIS.  Unfortunately there appear to be
@@ -739,12 +733,9 @@ int nls_count_chars(int cs_id, char *outbuf, un_long *nbytes)
                 **   0xa0       single-byte  undefined       1-byte
                 **   0xa1-0xdf  single-byte  single-byte     1-byte
                 **   0xe0-0xfc  2-byte lead  2-byte lead     2-byte
-                **   0xfd-0xff  single-byte  undefined       1-byte
-                **
-                ** ### May be incorrect for MAC Shift-JIS
+                **   0xfd-0xff  2-byte lead  undefined       2-byte
                 */
-                else if (((k == 0x80) || (k >= 0xFD) ||
-                          ((k >= 0xA0) && (k < 0xE0))) &&
+                else if (((k == 0x80) || ((k >= 0xA0) && (k < 0xE0))) &&
                          ((cs_id == SJIS1_CSID) || (cs_id == SJIS2_CSID) ||
                           (cs_id == SJIS3_CSID) || (cs_id == SJIS4_CSID)))
                     n = 1;
