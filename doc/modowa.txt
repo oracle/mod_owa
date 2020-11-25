@@ -1,15 +1,15 @@
                      Apache PL/SQL Gateway OWA Module (mod_owa)
                                  Doug McMahon
-                                 May 29, 2020
+                               November 24, 2020
                                 Version 2.11.10
 
        Copyright (c) 1999-2020 Oracle Corporation, All rights reserved.
 
 This module is a demonstration and example of the use of Oracle technology.
 It is made available for use at your own risk with no warranty of any kind.
-Read the open-source license (license.txt) to make sure you understand
-the terms of use.  The module has been approved for export from the USA;
-the ECCN is EAR99, NLR, with reference #01143.
+Read the open-source license to make sure you understand the terms of use.
+The module has been approved for export from the USA; the ECCN is EAR99,
+NLR, with reference #01143.
 
 *******************
 Release Information
