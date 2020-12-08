@@ -12,7 +12,7 @@ Configure Apache to call the module as explained in the documentation.
 ## Documentation
 
 The original documentation is here in both HTML form
-[modowa.htm](https://oracle.github.io/mod_owa/modowa.htm) and plaintext [https://oracle.github.io/mod_owa/modowa.txt](doc/modowa.txt).
+[modowa.htm](https://oracle.github.io/mod_owa/modowa.htm) and [plaintext]https://oracle.github.io/mod_owa/modowa.txt).
 
 ## Examples
 
