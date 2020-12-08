@@ -6,27 +6,27 @@ modplsql replacement technology.
 
 ## Installation
 
-Build the module from source code as explained in the documentation.
+Build the module from source code as [explained in the documentation](doc/modowa.htm).
 Configure Apache to call the module as explained in the documentation.
 
 ## Documentation
 
 The original documentation is here in both HTML form
-[modowa.htm] (doc/modowa.htm) and plaintext [modowa.txt] (doc/modowa.txt).
+[modowa.htm](doc/modowa.htm) and plaintext [modowa.txt](doc/modowa.txt).
 
 ## Examples
 
-Please see the documentation for the PL/SQL Gateway.
+Please see the [documentation for the PL/SQL Gateway](doc/modowa.htm).
 
 ## Help
 
 For questions or problems, you can contact the module author,
-[Doug McMahon] (mailto:doug.mcmahon@oracle.com).
+[Doug McMahon](mailto:doug.mcmahon@oracle.com).
 
 ## Contributing
 
-See CONTRIBUTING for details.
+See [CONTRIBUTING](CONTRIBUTING.md) for details.
 
 ## Security
 
-See SECURITY for details.
+See [SECURITY](SECURITY.md) for details.
