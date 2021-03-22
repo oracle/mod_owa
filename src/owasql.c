@@ -80,6 +80,7 @@
 ** 10/13/2015   D. McMahon      Add sql_bind_chr()
 ** 02/25/2017   D. McMahon      Dump environment on connect failures
 ** 01/02/2018   D. McMahon      More info for environment handle failure errors
+** 03/22/2021   D. McMahon      Ensure handle free on sql_disconnect
 */
 
 #define WITH_OCI
@@ -922,7 +923,7 @@ badaccess:
 */
 sword sql_disconnect(connection *c)
 {
-    sword status;
+    sword status = OCI_SUCCESS;
     sb4   oerrno = 0;
 
     c->c_lock = C_LOCK_NEW;
@@ -934,10 +935,17 @@ sword sql_disconnect(connection *c)
         c->session = (char *)0;
     }
 
-    status = OCISessionEnd(c->svchp, c->errhp, c->seshp, (ub4)OCI_DEFAULT);
-    if (status != OCI_SUCCESS) goto closeerr;
-    status = OCIServerDetach(c->srvhp, c->errhp, (ub4)OCI_DEFAULT);
-    if (status != OCI_SUCCESS) goto closeerr;
+    /* End connection to server/service */
+    if ((c->svchp) && (status == OCI_SUCCESS))
+      status = OCISessionEnd(c->svchp, c->errhp, c->seshp, (ub4)OCI_DEFAULT);
+    if ((c->srvhp) && (status == OCI_SUCCESS))
+      status = OCIServerDetach(c->srvhp, c->errhp, (ub4)OCI_DEFAULT);
+
+    if ((status != OCI_SUCCESS) && (c->errbuf))
+        oerrno = sql_get_error(c);
+    status = OCI_SUCCESS;
+
+    /* Free all allocated objects */
     if (c->stmhp1)
         status = OCIHandleFree((dvoid *)(c->stmhp1), (ub4)OCI_HTYPE_STMT);
     if (status != OCI_SUCCESS) goto closehand;
@@ -968,34 +976,30 @@ sword sql_disconnect(connection *c)
     if (c->pbfile)
         status = OCIDescriptorFree((dvoid *)(c->pbfile), (ub4)OCI_DTYPE_FILE);
     if (status != OCI_SUCCESS) goto closehand;
-    status = OCIHandleFree((dvoid *)(c->seshp), (ub4)OCI_HTYPE_SESSION);
+    if (c->seshp)
+      status = OCIHandleFree((dvoid *)(c->seshp), (ub4)OCI_HTYPE_SESSION);
     if (status != OCI_SUCCESS) goto closehand;
-    status = OCIHandleFree((dvoid *)(c->srvhp), (ub4)OCI_HTYPE_SERVER);
+    if (c->srvhp)
+      status = OCIHandleFree((dvoid *)(c->srvhp), (ub4)OCI_HTYPE_SERVER);
     if (status != OCI_SUCCESS) goto closehand;
-    status = OCIHandleFree((dvoid *)(c->svchp), (ub4)OCI_HTYPE_SVCCTX);
+    if (c->svchp)
+      status = OCIHandleFree((dvoid *)(c->svchp), (ub4)OCI_HTYPE_SVCCTX);
     if (status != OCI_SUCCESS) goto closehand;
-    status = OCIHandleFree((dvoid *)(c->errhp), (ub4)OCI_HTYPE_ERROR);
+    if (c->errhp)
+      status = OCIHandleFree((dvoid *)(c->errhp), (ub4)OCI_HTYPE_ERROR);
     if (status != OCI_SUCCESS) goto closehand;
-    status = OCIHandleFree((dvoid *)(c->envhp), (ub4)OCI_HTYPE_ENV);
-
-    return(status);
-
-closeerr:
-    if ((status != OCI_SUCCESS) && (c->errbuf))
-    {
-        oerrno = sql_get_error(c);
-        if (oerrno) status = oerrno;
-    }
-    return(status);
+    if (c->envhp)
+      status = OCIHandleFree((dvoid *)(c->envhp), (ub4)OCI_HTYPE_ENV);
 
 closehand:
-    if (status != OCI_SUCCESS)
+    if ((status != OCI_SUCCESS) && (oerrno == 0))
     {
         OCIErrorGet((dvoid *)(c->envhp), (ub4)1, (text *)0, &oerrno,
                     (text *)(c->errbuf),
                     (ub4)OCI_ERROR_MAXMSG_SIZE, (ub4)OCI_HTYPE_ENV);
-        if (oerrno) status = oerrno;
     }
+    if (oerrno) status = oerrno;
+
     return(status);
 }
 
