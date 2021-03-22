@@ -8,7 +8,7 @@ For bugs or enhancement requests, please file a GitHub issue unless it's
 security related. When filing a bug remember that the better written the
 bug is, the more likely it is to be fixed. If you think you've found a
 security vulnerability, do not raise a GitHub issue and follow the
-instructions on our [Security Policy] (https://linux-git.us.oracle.com/ogho/template-repo/blob/master/SECURITY.md)
+instructions on our [Security Policy](SECURITY.md)
 
 ## Contributing Code
 
