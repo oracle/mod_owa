@@ -1,9 +1,9 @@
                      Apache PL/SQL Gateway OWA Module (mod_owa)
                                  Doug McMahon
-                               November 24, 2020
-                                Version 2.11.10
+                                 June 15, 2021
+                                Version 2.11.12
 
-       Copyright (c) 1999-2020 Oracle Corporation, All rights reserved.
+       Copyright (c) 1999-2021 Oracle Corporation, All rights reserved.
 
 This module is a demonstration and example of the use of Oracle technology.
 It is made available for use at your own risk with no warranty of any kind.
@@ -188,6 +188,7 @@ Improvements and Enhancements
 Bugs Found/Fixed
 ================
 
+* Ensure OCI resources are freed when database close operations fail.
 * Fix a bad bug resizing arrays for multi-part/form-data submissions.
 * Pass OwaStart procedure as the CGI variable PATH_INFO.
 * Add space for trailing null after 32512 bytes.
