@@ -1,7 +1,7 @@
 /*
 ** mod_owa
 **
-** Copyright (c) 1999-2019 Oracle Corporation, All rights reserved.
+** Copyright (c) 1999-2021 Oracle Corporation, All rights reserved.
 **
 ** The Universal Permissive License (UPL), Version 1.0
 **
