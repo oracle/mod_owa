@@ -112,6 +112,7 @@
 ** 08/14/2018   D. McMahon      Limit HTBUF_ARRAY_MAX_WIDTH to 32511
 ** 08/20/2018   D. McMahon      Allow PATCH when OwaHttp == "REST"
 ** 10/18/2018   D. McMahon      Add dad_name.
+** 06/28/2021   D. McMahon      Include ociver.h
 */
 
 #ifndef MODOWA_H
@@ -207,6 +208,7 @@ typedef struct request_rec request_rec;
 */
 #include <oratypes.h>
 #include <oci.h>
+#include <ociver.h>
 
 #endif /* WITH_OCI */
 
@@ -1139,6 +1141,8 @@ int      util_scramble(char *scramble, int klen,
 int   sql_conn_size(int arrsz);
 
 int   sql_init(void);
+
+void  sql_get_version(int *major, int *minor);
 
 #ifdef WITH_OCI
 

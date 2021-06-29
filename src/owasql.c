@@ -81,6 +81,7 @@
 ** 02/25/2017   D. McMahon      Dump environment on connect failures
 ** 01/02/2018   D. McMahon      More info for environment handle failure errors
 ** 03/22/2021   D. McMahon      Ensure handle free on sql_disconnect
+** 06/29/2021   D. McMahon      Add sql_get_version
 */
 
 #define WITH_OCI
@@ -1992,4 +1993,13 @@ descexit:
     status = OCIHandleFree((dvoid *)dschp, (ub4)OCI_HTYPE_DESCRIBE);
 
     return(result);
+}
+
+/*
+** Return the OCI major/minor version numbers
+*/
+void sql_get_version(int *major, int *minor)
+{
+  *major = OCI_MAJOR_VERSION;
+  *minor = OCI_MINOR_VERSION;
 }

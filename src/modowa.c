@@ -98,6 +98,7 @@
 ** 05/30/2018   D. McMahon      Fix mutex initialization
 ** 08/20/2018   D. McMahon      Reclassify PATCH as a REST method
 ** 10/18/2018   D. McMahon      Add OwaDadName
+** 06/29/2021   D. McMahon      Log OCI major/minor version numbers
 */
 
 #ifdef APACHE24
@@ -1792,6 +1793,13 @@ static int oracle_module(apr_pool_t *p, apr_pool_t *ptemp,
     RESET_ERRNO;
     ap_log_error(APLOG_MARK, APLOG_INFO, LOGSTATUS(s),
                  "OWA module initialized %d", os_get_pid());
+
+    {
+        int major, minor;
+        sql_get_version(&major, &minor);
+        ap_log_error(APLOG_MARK, APLOG_INFO, LOGSTATUS(s),
+                     "OCI version %d.%d", major, minor);
+    }
 
     return(OK);
 }
