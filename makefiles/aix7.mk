@@ -1,3 +1,8 @@
+#
+# Copyright (c) 1999-2021 Oracle Corporation, All rights reserved.
+# Licensed under the Universal Permissive License v 1.0
+#       as shown at https://oss.oracle.com/licenses/upl/
+#
 # Makefile for mod_owa.so
 #
 # Usage:  make -kf modowa.mk
