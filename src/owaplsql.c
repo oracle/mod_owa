@@ -80,6 +80,7 @@
 ** 04/27/2014   D. McMahon      Zero init temporary connection hdb
 ** 09/11/2015   D. McMahon      Disallow control characters in headers
 ** 10/13/2015   D. McMahon      Limit CGIPOST buffer to 32k (per Fulvio Bille)
+** 11/29/2021   D. McMahon      Return OK for blank pages if dav_mode set
 */
 
 #define WITH_OCI
@@ -1626,7 +1627,7 @@ int owa_getpage(connection *c, owa_context *octx, request_rec *r,
             */
             if (ecount == 0)
             {
-                if (octx->dav_mode > 0)
+                if (octx->dav_mode >= 0)
                     *rstatus = OK;
                 else
                     *rstatus = HTTP_NOT_FOUND;
@@ -2178,7 +2179,10 @@ int owa_getheader(connection *c, owa_context *octx, request_rec *r,
     /* No data returned from the OWA. */
     if (ecount == 0)
     {
-        *rstatus = HTTP_NOT_FOUND;
+        if (octx->dav_mode >= 0)
+            *rstatus = OK;
+        else
+            *rstatus = HTTP_NOT_FOUND;
         return(status);
     }
 

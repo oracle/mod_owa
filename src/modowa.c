@@ -99,6 +99,7 @@
 ** 08/20/2018   D. McMahon      Reclassify PATCH as a REST method
 ** 10/18/2018   D. McMahon      Add OwaDadName
 ** 06/29/2021   D. McMahon      Log OCI major/minor version numbers
+** 11/29/2021   D. McMahon      Default dav_mode to -1 (unconfigured)
 */
 
 #ifdef APACHE24
@@ -1535,7 +1536,7 @@ static void *oracle_location_config(apr_pool_t *p, char *dirspec)
         if (dirspec) str_copy(octx->location, dirspec);
 
         octx->pool_wait_ms = MAX_WAIT;
-        octx->dav_mode = 0;
+        octx->dav_mode = -1; /* Default is "unset" */
         octx->poolsize = MIN_POOL;
         octx->version = OWA_AUTH_NONE;
         octx->nls_cs = (char *)"";

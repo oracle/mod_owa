@@ -128,7 +128,7 @@
 # endif
 #endif
 
-#define MODOWA_VERSION_STRING "mod_owa 2.11.12";
+#define MODOWA_VERSION_STRING "mod_owa 2.11.13";
 
 #ifdef MODOWA_WINDOWS
 
