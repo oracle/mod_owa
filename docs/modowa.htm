@@ -6,8 +6,8 @@
 <h2>(mod_owa)</h2>
 <h4><font color="#000080"><i>Doug McMahon</i>
 <br>(Doug.McMahon@oracle.com)</font></h4>
-<h4><font color="#c00000">June 15, 2021</font></h4>
-<h4>Version 2.11.12</h4>
+<h4><font color="#c00000">November 29, 2021</font></h4>
+<h4>Version 2.11.13</h4>
 <p><font size="-1">Copyright (c) 1999-2021 Oracle Corporation,
 All rights reserved.</font></p>
 </center>
@@ -253,6 +253,7 @@ OwaAlternate directive:<br>
 
 <h4><a name="_enhance">Improvements and Enhancements</a></h4>
 <ul type="disc">
+<li>Return OK for blank pages from PL/SQL if OwaHttp is configured.</li>
 <li>Add OwaDadName directive.</li>
 <li>Treat PATCH as a REST method for OwaHttp.</li>
 <li>OwaReject does exact matches for PACKAGE.PROCEDURE strings.</li>
@@ -1944,7 +1945,9 @@ default for normal response to &quot;text/html&quot;:<br>
 The default is &quot;NORMAL&quot;, which supports only GET and POST, and is
 compatible with previous releases of mod_owa. &quot;REST&quot; adds support
 for the PUT, DELETE, and PATCH methods. &quot;DAV&quot; is unsupported at
-this time.
+this time. If &quot;NORMAL&quot; is configured, blank pages from the gateway
+are no longer automatically given status 404 (not found), a behavior of
+older versions of mod_owa and still the default if OwaHttp is not set.
 </p></td></tr>
 <tr valign="top"><td align="right">OwaDav<br>
 <font color="#000080"><i>oracle_dav</i></font></td><td>&nbsp;&nbsp;</td>

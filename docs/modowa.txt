@@ -1,7 +1,7 @@
                      Apache PL/SQL Gateway OWA Module (mod_owa)
                                  Doug McMahon
-                                 June 15, 2021
-                                Version 2.11.12
+                               November 29, 2021
+                                Version 2.11.13
 
        Copyright (c) 1999-2021 Oracle Corporation, All rights reserved.
 
@@ -100,6 +100,7 @@ If you have problems or questions, you can e-mail at Doug.McMahon@oracle.com.
 Improvements and Enhancements
 =============================
 
+* Return OK for blank pages from PL/SQL if OwaHttp is configured.
 * Add OwaDadName directive.
 * Treat PATCH as a REST method for OwaHttp.
 * OwaReject does exact matches for PACKAGE.PROCEDURE strings.
@@ -1432,7 +1433,11 @@ provided in later sections of this document.
   oracle_http      protocol support. The default is "NORMAL", which supports
                    only GET and POST, and is compatible with previous releases
                    of mod_owa. "REST" adds support for the PUT, DELETE and
-                   PATCH methods. "DAV" is unsupported at this time.
+                   PATCH methods. "DAV" is unsupported at this time. If
+                   "NORMAL" is configured, blank pages from the gateway
+                   are no longer automatically given status 404 (not found),
+                   a behavior of older versions of mod_owa and still the
+                   default if OwaHttp is not set.
   OwaDav           This optional directive specifies a procedure to handle
   oracle_dav       REST and DAV requests.
   OwaRefXml        This directive can be used to override the tags used when
@@ -3695,7 +3700,8 @@ optional OwaHttp parameter, this can be expanded to include PUT and
 DELETE requests, or even the full set of DAV requests.
 
 * NORMAL The mod_owa default, compatible with earlier releases.
-* REST   Enables mod_owa to handle PUT, DELETE and PATCH to support REST services.
+* REST   Enables mod_owa to handle PUT, DELETE and PATCH
+         to support REST services.
 * DAV    Enables all DAV operations (not yet completed).
 
 If the request contains a content body that cannot be interpreted as
