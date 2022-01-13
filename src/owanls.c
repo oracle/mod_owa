@@ -100,6 +100,7 @@
 ** 09/11/2015   D. McMahon      Add nls_sanitize_header and nls_copy_identifier
 ** 09/09/2015   D. McMahon      GBK is reclassified as non-byte-unique
 ** 03/08/2018   D. McMahon      Added WE8ISO8859P15 (latin-9)
+** 01/12/2022   D. McMahon      Use unsigned comparsions in nls_sanitize_header
 */
 
 #include <modowa.h>
@@ -914,7 +915,7 @@ void nls_sanitize_header(char *sptr)
 {
     while (*sptr)
     {
-        if (*sptr < ' ') *sptr = ' ';
+        if ((*sptr & 0xFF) < ' ') *sptr = ' ';
         ++sptr;
     }
 }
