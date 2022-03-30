@@ -81,6 +81,7 @@
 ** 09/11/2015   D. McMahon      Disallow control characters in headers
 ** 10/13/2015   D. McMahon      Limit CGIPOST buffer to 32k (per Fulvio Bille)
 ** 11/29/2021   D. McMahon      Return OK for blank pages if dav_mode set
+** 03/30/2022   D. McMahon      Use HTBUF_ENV_MAX for session cookie size
 */
 
 #define WITH_OCI
@@ -680,7 +681,7 @@ void owa_find_session(owa_context *octx, char *cookieval, char *session)
                 */
                 ++sptr;
                 clen = (int)(nptr - sptr);
-                if (clen >= HTBUF_HEADER_MAX) clen = HTBUF_HEADER_MAX - 1;
+                if (clen >= HTBUF_ENV_MAX) clen = HTBUF_ENV_MAX - 1;
                 mem_copy(session, sptr, clen);
                 session[clen] = '\0';
                 break;
@@ -2237,8 +2238,8 @@ int owa_getheader(connection *c, owa_context *octx, request_rec *r,
             nls_sanitize_header(headval);
             morq_table_put(r,OWA_TABLE_HEADOUT,0,"Content-Disposition",headval);
             if (octx->diagflag & DIAG_RESPONSE)
-              debug_out(octx->diagfile,
-                        "  Content-Disposition: %s\n", headval, (char *)0, 0, 0);
+              debug_out(octx->diagfile, "  Content-Disposition: %s\n",
+                        headval, (char *)0, 0, 0);
         }
         else if (!str_compare(sptr, "Last-Modified:", 14, 1))
         {

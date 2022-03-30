@@ -87,6 +87,7 @@
 ** 09/11/2015   D. McMahon      Disallow control characters in headers
 ** 07/14/2016   D. McMahon      Avoid 1460 errors on 32-bit OCIs
 ** 09/09/2016   D. McMahon      Fix separator search for: Shift-JIS, BIG-5, GBK
+** 03/30/2022   D. McMahon      Use HTBUF_HEADER_MAX as LOB chunk size
 */
 
 #define WITH_OCI
@@ -903,7 +904,7 @@ int owa_writedata(connection *c, owa_context *octx, request_rec *r,
                     if (!aptr) break; /* Error - field item too large */
                     i = (int)(aptr - sptr);
                     /* If field width > 4000, chunk the data */
-                    if (i >= HTBUF_ENV_MAX)
+                    if (i >= HTBUF_HEADER_MAX)
                     {
                         int   ncbytes = 0;
                         int   nchunks = 0;
@@ -934,10 +935,10 @@ int owa_writedata(connection *c, owa_context *octx, request_rec *r,
                             ** and copy data into null-terminated string.
                             */
                             chunklen = (i - ncbytes);
-                            if (chunklen >= HTBUF_ENV_MAX)
+                            if (chunklen >= HTBUF_HEADER_MAX)
                             {
                                 chunklen = nls_length(cs_id, sptr + ncbytes,
-                                                      HTBUF_ENV_MAX - 1);
+                                                      HTBUF_HEADER_MAX - 1);
                             }
                             pchunk = (char *)morq_alloc(r, chunklen + 1, 0);
                             if (!pchunk)

@@ -124,6 +124,7 @@
 ** 10/18/2018   D. McMahon      Add DAD_NAME to the CGI environment
 ** 10/22/2018   D. McMahon      Set PATH_INFO for OwaStart
 ** 05/29/2020   D. McMahon      Fix a serious bug in array resizing
+** 03/30/2022   D. McMahon      Use HTBUF_ENV_MAX for CGI variables
 */
 
 #define WITH_OCI
@@ -2812,7 +2813,7 @@ int owa_handle_request(owa_context *octx, request_rec *r,
     char         *physical = (char *)0;
     int           spflag = 2;
     env_record    senv;
-    char          stmtbuf[HTBUF_HEADER_MAX];
+    char          stmtbuf[HTBUF_PLSQL_MAX];
     char         *ptrbuf[HTBUF_PARAM_CHUNK*3];
     ub4           uintbuf[HTBUF_PARAM_CHUNK];
     sb4           sintbuf[HTBUF_PARAM_CHUNK];
@@ -2825,7 +2826,7 @@ int owa_handle_request(owa_context *octx, request_rec *r,
     char         *param_temp; /* For flexible argument mode */
     char        **param_ptrs = (char **)0;
     ub2          *param_lens = (ub2 *)0;
-    char          pmimetype[HTBUF_HEADER_MAX];
+    char          pmimetype[HTBUF_ENV_MAX];
     char          prawchar[LONG_MAXSTRLEN];
     char          pdocload[HTBUF_HEADER_MAX];
     char          pcdisp[HTBUF_HEADER_MAX];
@@ -3071,7 +3072,8 @@ int owa_handle_request(owa_context *octx, request_rec *r,
           sptr = doc_start;
         }
 
-        morq_table_put(r, OWA_TABLE_SUBPROC, reset, (char *)env_path_name, sptr);
+        morq_table_put(r, OWA_TABLE_SUBPROC, reset,
+                       (char *)env_path_name, sptr);
         wd = str_length((char *)env_path_name);
         if (wd > nwidth) nwidth = wd;
         wd = str_length(sptr);

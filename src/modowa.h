@@ -113,6 +113,7 @@
 ** 08/20/2018   D. McMahon      Allow PATCH when OwaHttp == "REST"
 ** 10/18/2018   D. McMahon      Add dad_name.
 ** 06/28/2021   D. McMahon      Include ociver.h
+** 03/30/2022   D. McMahon      Increase HTBUF_ENV_MAX to 8000
 */
 
 #ifndef MODOWA_H
@@ -128,7 +129,7 @@
 # endif
 #endif
 
-#define MODOWA_VERSION_STRING "mod_owa 2.11.13";
+#define MODOWA_VERSION_STRING "mod_owa 2.11.14";
 
 #ifdef MODOWA_WINDOWS
 
@@ -358,7 +359,7 @@ typedef struct request_rec request_rec;
 #define HTBUF_BLOCK_SIZE   32768    /* Size of a file upload block    */
 #define HTBUF_BLOCK_READ   65536    /* Size of a file download block  */
 #define HTBUF_PARAM_CHUNK     64    /* Increment for parameter allocs */
-#define HTBUF_ENV_MAX   HTBUF_HEADER_MAX
+#define HTBUF_ENV_MAX   (HTBUF_HEADER_MAX*2)
 #define HTBUF_ENV_NAM   80          /* HTTP header element name size  */
 #define HTBUF_ENV_ARR   40          /* Number of HTTP elements max    */
 
