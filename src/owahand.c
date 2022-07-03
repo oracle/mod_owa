@@ -3885,9 +3885,10 @@ checkflex:
             j = param_width[i];
             if (j > HTBUF_ARRAY_MAX_WIDTH) j = HTBUF_ARRAY_MAX_WIDTH+1;
             if (j > n) n = j;
-            if (param_ptrs[i] != empty_string)
-              if (param_ptrs[i][j - 1] != '\0')
-                param_ptrs[i][j - 1] = '\0';
+            if ((param_ptrs[i] != NULL) && (param_ptrs[i] != empty_string))
+              if ((param_ptrs[i][0] != '\0') && (j > 0))
+                if (param_ptrs[i][j - 1] != '\0')
+                  param_ptrs[i][j - 1] = '\0';
         }
         n = (int)util_round((un_long)n, octx->scale_round);
         if (n > HTBUF_ARRAY_MAX_WIDTH) n = HTBUF_ARRAY_MAX_WIDTH+1;
