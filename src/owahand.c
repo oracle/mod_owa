@@ -125,6 +125,7 @@
 ** 10/22/2018   D. McMahon      Set PATH_INFO for OwaStart
 ** 05/29/2020   D. McMahon      Fix a serious bug in array resizing
 ** 03/30/2022   D. McMahon      Use HTBUF_ENV_MAX for CGI variables
+** 07/04/2022   D. McMahon      Fix handling of empty string in array pivot
 */
 
 #define WITH_OCI
@@ -1261,7 +1262,9 @@ static const char env_path_name[]    = "PATH_INFO";
 static const char env_remote_ip[]    = "REMOTE_ADDR";
 static const char env_authorize[]    = "HTTP_AUTHORIZATION";
 static const char env_remote_usr[]   = "REMOTE_USER";
+#ifdef NEVER
 static const char env_content_type[] = "CONTENT_TYPE";
+#endif
 
 /*
 ** Scan subprocess environment for path, boundary, content length, etc.
@@ -3882,7 +3885,9 @@ checkflex:
             j = param_width[i];
             if (j > HTBUF_ARRAY_MAX_WIDTH) j = HTBUF_ARRAY_MAX_WIDTH+1;
             if (j > n) n = j;
-            if (param_ptrs[i][j - 1] != '\0') param_ptrs[i][j - 1] = '\0';
+            if (param_ptrs[i] != empty_string)
+              if (param_ptrs[i][j - 1] != '\0')
+                param_ptrs[i][j - 1] = '\0';
         }
         n = (int)util_round((un_long)n, octx->scale_round);
         if (n > HTBUF_ARRAY_MAX_WIDTH) n = HTBUF_ARRAY_MAX_WIDTH+1;
