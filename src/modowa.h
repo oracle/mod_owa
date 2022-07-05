@@ -704,6 +704,7 @@ struct owa_context
     char           *doc_start;      /* First-page procedure                 */
     char           *doc_table;
     char           *doc_column;
+    char           *ora_valid;
     char           *ora_before;
     char           *ora_after;
     char           *ora_proc;
