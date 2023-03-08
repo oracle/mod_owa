@@ -126,6 +126,7 @@
 ** 05/29/2020   D. McMahon      Fix a serious bug in array resizing
 ** 03/30/2022   D. McMahon      Use HTBUF_ENV_MAX for CGI variables
 ** 07/04/2022   D. McMahon      Fix handling of empty string in array pivot
+** 03/07/2023   D. McMahon      OwaHeader support
 */
 
 #define WITH_OCI
@@ -1277,11 +1278,10 @@ static int search_env(owa_context *octx, request_rec *r,
                       char **authuser, char **authpass, char *session,
                       int *wdb_realm_logout)
 {
-    int   i;
+    int   i, j, n;
     int   nwidth = 30;
     int   vwidth = 30;
     long_64 clen = 0;
-    int   n;
     char *sptr;
     char *nptr;
     char *vptr;
@@ -1319,14 +1319,37 @@ static int search_env(owa_context *octx, request_rec *r,
     }
 
     /*
-    ** Measure lengths of any additional env variables
+    ** Append additional environment variables
     */
-    for (i = 0; i < octx->nenvs; ++i)
+    for (j = 0; j < octx->nenvs; ++j)
     {
-        n = str_length(octx->envvars[i].name);
-        if (i > nwidth) nwidth = i;
-        n = str_length(octx->envvars[i].value);
-        if (i > vwidth) vwidth = i;
+        morq_table_put(r, OWA_TABLE_SUBPROC, 0,
+                       octx->envvars[j].name, octx->envvars[j].value);
+        n = str_length(octx->envvars[j].name);
+        if (n > nwidth) nwidth = n;
+        n = str_length(octx->envvars[j].value);
+        if (n > vwidth) vwidth = n;
+    }
+
+    /*
+    ** Transfer selected request headers to CGI
+    */
+    if (octx->nheads > 0)
+    {
+        for (i = 0; morq_table_get(r, OWA_TABLE_HEADIN, i, &nptr, &vptr); ++i)
+        {
+            for (j = 0; j < octx->nheads; ++j)
+                if (!str_compare(nptr, octx->headvars[j].header_name, -1, 1))
+                {
+                    sptr = octx->headvars[j].variable_name;
+                    morq_table_put(r, OWA_TABLE_SUBPROC, 0, sptr, vptr);
+                    n = str_length(sptr);
+                    if (n > nwidth) nwidth = n;
+                    n = str_length(vptr);
+                    if (n > vwidth) vwidth = n;
+                    break;
+                }
+        }
     }
 
     if (octx->diagflag & DIAG_CGIENV)
@@ -1337,9 +1360,7 @@ static int search_env(owa_context *octx, request_rec *r,
     ** Search for CONTENT_LENGTH, CONTENT_TYPE, PATH_INFO and values,
     ** measure maximum column widths for name and value arrays.
     */
-    for (i = 0;
-         morq_table_get(r, OWA_TABLE_SUBPROC, i, &nptr, &vptr);
-         ++i)
+    for (i = 0; morq_table_get(r, OWA_TABLE_SUBPROC, i, &nptr, &vptr); ++i)
     {
         if (!nptr) continue;
         if (!vptr) vptr = (char *)"";
@@ -1935,13 +1956,6 @@ static int search_env(owa_context *octx, request_rec *r,
           }
         }
       }
-
-    /*
-    ** Append additional environment variables
-    */
-    for (n = 0; n < octx->nenvs; ++n, ++i)
-        morq_table_put(r, OWA_TABLE_SUBPROC, 0,
-                       octx->envvars[n].name, octx->envvars[n].value);
 
     *nenv = i;
 

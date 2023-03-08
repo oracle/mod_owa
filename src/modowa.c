@@ -100,6 +100,7 @@
 ** 10/18/2018   D. McMahon      Add OwaDadName
 ** 06/29/2021   D. McMahon      Log OCI major/minor version numbers
 ** 11/29/2021   D. McMahon      Default dav_mode to -1 (unconfigured)
+** 03/07/2023   D. McMahon      Added OwaHeader
 */
 
 #ifdef APACHE24
@@ -1342,6 +1343,36 @@ static const char *mowa_env(cmd_parms *cmd, owa_context *octx,
     return((char *)0);
 }
 
+static const char *mowa_hdr(cmd_parms *cmd, owa_context *octx,
+                            char *hname, char *vname)
+{
+    headvar *new_heads;
+    headvar *old_heads;
+    int      i, n;
+
+    if ((hname) && (vname))
+    {
+        old_heads = octx->headvars;
+        n = octx->nheads;
+        if ((n % CACHE_MAX_ALIASES) == 0)
+        {
+            /* Extend the table by reallocation */
+            i = (n + CACHE_MAX_ALIASES) * sizeof(*new_heads);
+            new_heads = (headvar *)apr_palloc(cmd->pool, i);
+            if (!new_heads) return(alloc_failure(cmd->server, i));
+            octx->headvars = new_heads;
+            for (i = 0; i < n; ++i) new_heads[i] = old_heads[i];
+            old_heads = new_heads;
+        }
+
+        old_heads[n].header_name   = hname;
+        old_heads[n].variable_name = vname;
+        ++(octx->nheads);
+    }
+
+    return((char *)0);
+}
+
 static const char *mowa_crtl(cmd_parms *cmd, owa_context *octx,
                              char *ipsubnet, char *ipmask)
 {
@@ -1947,6 +1978,8 @@ ARG_PATTERN("OwaReject",       ARG_FN(mowa_reject), ACCESS_CONF,   TAKE1,
             "OwaReject <package/procedure prefix>"                     ),
 ARG_PATTERN("OwaEnv",          ARG_FN(mowa_env),    ACCESS_CONF,   TAKE2,
             "OwaEnv <variable name> <variable value>"                  ),
+ARG_PATTERN("OwaHeader",       ARG_FN(mowa_hdr),    ACCESS_CONF,   TAKE2,
+            "OwaHeader <header name> <variable name>"                  ),
 ARG_PATTERN("OwaDadName",      ARG_SET(dad_name),   ACCESS_CONF,   TAKE1,
             "OwaDadName <name of the data access descriptor>"          ),
 ARG_PATTERN("OwaDocPath",      ARG_SET(doc_path),   ACCESS_CONF,   TAKE1,

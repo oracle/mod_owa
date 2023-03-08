@@ -1,9 +1,9 @@
                      Apache PL/SQL Gateway OWA Module (mod_owa)
                                  Doug McMahon
-                               November 29, 2021
-                                Version 2.11.13
+                                 March 7, 2023
+                                Version 2.11.16
 
-       Copyright (c) 1999-2021 Oracle Corporation, All rights reserved.
+       Copyright (c) 1999-2023 Oracle Corporation, All rights reserved.
 
 This module is a demonstration and example of the use of Oracle technology.
 It is made available for use at your own risk with no warranty of any kind.
@@ -185,6 +185,7 @@ Improvements and Enhancements
   possible on HTTP response headers.
 * Added the ability to recover from a database shutdown/restart that
   invalidates connections in the pool.
+* Add OwaHeader directive.
 
 Bugs Found/Fixed
 ================
@@ -1039,13 +1040,14 @@ Summary of directives:
   OwaFlex         oracle_flex      use flexible arguments for procedure
   OwaReject       oracle_reject    disallow prefixes
   OwaEnv          oracle_env       add name/value pairs to environment
-  OwaLDAP         oracle_ldap      convert basic auth user/pass to DB user/pass
+  OwaHeader       oracle_header    add name/value pairs to environment
   OwaCharsize     oracle_charsize  set maximum bytes/character for DB buffer
   OwaContentType  oracle_ctype     set default content type for responses
   OwaHttp         oracle_http      set level of HTTP method support
   OwaDav          oracle_dav       set handler for REST and DAV operations
   OwaRefXml       refcur_xml       set REF cursor XML tags
   OwaDadName      dad_name         set DAD_NAME CGI parameter
+  OwaLDAP         oracle_ldap      convert basic auth user/pass to DB user/pass
 
                    Global Directives
 
@@ -1405,6 +1407,12 @@ provided in later sections of this document.
                    CGI environment passed to PL/SQL by mod_owa.  Note that
                    OwaEnv has no effect on the environment used by the
                    Apache worker processes.
+  OwaHeader        This is an optional parameter that can appear multiple
+  oracle_header    times for any Location.  It specifies a request header
+                   name and a CGI environment variable name to map it to.
+                   For example, "OwaHeader X-FOO-BAR FOOBAR" adds an
+                   environment variable "FOOBAR" with the value of the
+                   header X-FOO-BAR, if present on the request.
   OwaLDAP          This optional directive specifies a procedure for
   oracle_ldap      converting a basic authentication username/password
                    and/or session cookie to a database username/password

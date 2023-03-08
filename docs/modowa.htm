@@ -6,9 +6,9 @@
 <h2>(mod_owa)</h2>
 <h4><font color="#000080"><i>Doug McMahon</i>
 <br>(Doug.McMahon@oracle.com)</font></h4>
-<h4><font color="#c00000">November 29, 2021</font></h4>
-<h4>Version 2.11.13</h4>
-<p><font size="-1">Copyright (c) 1999-2021 Oracle Corporation,
+<h4><font color="#c00000">March 7, 2023</font></h4>
+<h4>Version 2.11.16</h4>
+<p><font size="-1">Copyright (c) 1999-2023 Oracle Corporation,
 All rights reserved.</font></p>
 </center>
 <hr size="2" noshade width="50%" align="center">
@@ -342,6 +342,7 @@ multi-valued attributes (e.g. oracle_diag).</li>
 possible on HTTP response headers.</li>
 <li>Added the ability to recover from a database shutdown/restart that
 invalidates connections in the pool.</li>
+<li>Add OwaHeader directive.</li>
 </ul>
 
 <h4><a name="_bugs">Bugs Found/Fixed</a></h4>
@@ -1483,8 +1484,8 @@ Summary of directives:
 <td>OwaEnv</td><td>&nbsp;&nbsp;</td><td>oracle_env</td>
 <td>&nbsp;&nbsp;</td><td>add name/value pairs to environment</td></tr>
 <tr valign="top" bgcolor="#c0e0ff">
-<td>OwaLDAP</td><td>&nbsp;&nbsp;</td><td>oracle_ldap</td>
-<td>&nbsp;&nbsp;</td><td>convert basic auth user/pass to DB user/pass</td></tr>
+<td>OwaHeader</td><td>&nbsp;&nbsp;</td><td>oracle_header</td>
+<td>&nbsp;&nbsp;</td><td>add request headers to environment</td></tr>
 <tr valign="top" bgcolor="#e0f0ff">
 <td>OwaCharsize</td><td>&nbsp;&nbsp;</td><td>oracle_charsize</td>
 <td>&nbsp;&nbsp;</td><td>set maximum bytes/character for DB buffer</td></tr>
@@ -1503,6 +1504,9 @@ Summary of directives:
 <tr valign="top" bgcolor="#c0e0ff">
 <td>OwaDadName</td><td>&nbsp;&nbsp;</td><td>dad_name</td>
 <td>&nbsp;&nbsp;</td><td>set DAD_NAME CGI parameter</td></tr>
+<tr valign="top" bgcolor="#e0f0ff">
+<td>OwaLDAP</td><td>&nbsp;&nbsp;</td><td>oracle_ldap</td>
+<td>&nbsp;&nbsp;</td><td>convert basic auth user/pass to DB user/pass</td></tr>
 <tr valign="top"><td colspan="5">&nbsp;</td></tr>
 <tr valign="top">
 <td colspan="5" align="center"><i>Global Directives</i></td></tr>
@@ -1910,15 +1914,13 @@ myval&quot; adds an environment variable &quot;MYVAR&quot; with value
 &quot;myval&quot; to the CGI environment passed to PL/SQL by
 mod_owa.  Note that OwaEnv has no effect on the environment used by
 the Apache worker processes.</p></td></tr>
-<tr valign="top"><td align="right">OwaLDAP<br>
-<font color="#000080"><i>oracle_ldap</i></font></td><td>&nbsp;&nbsp;</td>
-<td><p>This optional directive specifies a procedure for converting a
-basic authentication username/password and/or session cookie to a database
-username/password suitable for connection.  It works in conjunction with
-OwaRealm and/or OwaSession and is described below.  Note that use of this
-directive may add significant overhead to request handling, since a special
-database connection must be created to make the call to your
-procedure.</p></td></tr>
+<tr valign="top"><td align="right">OwaHeader<br>
+<font color="#000080"><i>oracle_header</i></font></td><td>&nbsp;&nbsp;</td>
+<td><p>This is an optional parameter that can appear multiple times for
+any Location.  It specifies a request header name and a CGI environment
+variable name to map it to.  For example, &quot;OwaHeader X-FOO-BAR FOOBAR&quot;
+adds an environment variable &quot;FOOBAR&quot; with the value of the header
+header X-FOO-BAR, if present on the request.</p></td></tr>
 <tr valign="top"><td align="right">OwaCharsize<br>
 <font color="#000080"><i>oracle_charsize</i></font></td><td>&nbsp;&nbsp;</td>
 <td><p>This optional directive specifies the maximum number of bytes needed to
@@ -1964,6 +1966,15 @@ and the namespace prefix and URI.  Example:<br>
 <tr valign="top"><td align="right">OwaDadName<br>
 <font color="#000080"><i>dad_name</i></font></td><td>&nbsp;&nbsp;</td>
 <td><p>This directive sets the DAD_NAME CGI variable.</p></td></tr>
+<tr valign="top"><td align="right">OwaLDAP<br>
+<font color="#000080"><i>oracle_ldap</i></font></td><td>&nbsp;&nbsp;</td>
+<td><p>This optional directive specifies a procedure for converting a
+basic authentication username/password and/or session cookie to a database
+username/password suitable for connection.  It works in conjunction with
+OwaRealm and/or OwaSession and is described below.  Note that use of this
+directive may add significant overhead to request handling, since a special
+database connection must be created to make the call to your
+procedure.</p></td></tr>
 
 <tr><td colspan="3"><br></td></tr>
 <tr valign="top" bgcolor="#80c0ff"><td colspan="2"><b>Directive</b></td>

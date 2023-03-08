@@ -114,6 +114,7 @@
 ** 10/18/2018   D. McMahon      Add dad_name.
 ** 06/28/2021   D. McMahon      Include ociver.h
 ** 03/30/2022   D. McMahon      Increase HTBUF_ENV_MAX to 8000
+** 03/07/2023   D. McMahon      Added OwaHeader
 */
 
 #ifndef MODOWA_H
@@ -129,7 +130,7 @@
 # endif
 #endif
 
-#define MODOWA_VERSION_STRING "mod_owa 2.11.15";
+#define MODOWA_VERSION_STRING "mod_owa 2.11.16";
 
 #ifdef MODOWA_WINDOWS
 
@@ -631,6 +632,15 @@ typedef struct envstruct
 } envstruct;
 
 /*
+** Structure to hold a header/variable mapping
+*/
+typedef struct headvar
+{
+    char    *header_name;
+    char    *variable_name;
+} headvar;
+
+/*
 ** Structure to hold a describe result
 */
 typedef struct descstruct descstruct;
@@ -767,6 +777,8 @@ struct owa_context
     char          **rejectprocs;
     int             nenvs;
     envstruct      *envvars;
+    int             nheads;
+    headvar        *headvars;
     un_long         scale_round;
     un_long         arr_round;
     char           *ref_root_tag;
