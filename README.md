@@ -1,4 +1,4 @@
-## About mod_owa
+# mod_owa
 
 This is a demonstration of Oracle's PL/SQL gateway for Apache using
 OCI8 technology. It doesn't fully replace modplsql. ORDS is the
