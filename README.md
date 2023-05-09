@@ -1,4 +1,4 @@
-## About mod_owa
+# mod_owa
 
 This is a demonstration of Oracle's PL/SQL gateway for Apache using
 OCI8 technology. It doesn't fully replace modplsql. ORDS is the
@@ -25,8 +25,16 @@ For questions or problems, you can contact the module author,
 
 ## Contributing
 
-See [CONTRIBUTING](CONTRIBUTING.md) for details.
+This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
 
 ## Security
 
 See [SECURITY](SECURITY.md) for details.
+
+## License
+
+Copyright (c) 2020, 2023 Oracle and/or its affiliates.
+
+Released under the Universal Permissive License v1.0 as shown at
+<https://oss.oracle.com/licenses/upl/>.
+
