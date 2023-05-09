@@ -115,6 +115,7 @@
 ** 06/28/2021   D. McMahon      Include ociver.h
 ** 03/30/2022   D. McMahon      Increase HTBUF_ENV_MAX to 8000
 ** 03/07/2023   D. McMahon      Added OwaHeader
+** 05/08/2023   D. McMahon      Add sql_set_nls()
 */
 
 #ifndef MODOWA_H
@@ -130,7 +131,7 @@
 # endif
 #endif
 
-#define MODOWA_VERSION_STRING "mod_owa 2.11.16";
+#define MODOWA_VERSION_STRING "mod_owa 2.11.17";
 
 #ifdef MODOWA_WINDOWS
 
@@ -1170,6 +1171,8 @@ sword sql_close_rset(connection *c);
 sword sql_transact(connection *c, int rollback_flag);
 
 void  sql_get_nls(connection *c, owa_context *octx);
+
+void  sql_set_nls(connection *c, owa_context *octx);
 
 sb4   sql_get_error(connection *c);
 

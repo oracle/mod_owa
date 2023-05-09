@@ -6,8 +6,8 @@
 <h2>(mod_owa)</h2>
 <h4><font color="#000080"><i>Doug McMahon</i>
 <br>(Doug.McMahon@oracle.com)</font></h4>
-<h4><font color="#c00000">March 7, 2023</font></h4>
-<h4>Version 2.11.16</h4>
+<h4><font color="#c00000">May 8, 2023</font></h4>
+<h4>Version 2.11.17</h4>
 <p><font size="-1">Copyright (c) 1999-2023 Oracle Corporation,
 All rights reserved.</font></p>
 </center>
@@ -438,6 +438,7 @@ download (due to omission of parse for OWA.GET_PAGE cursor).</li>
 <li>Intermittent spin in Windows WriteFile routine due to incorrect parameters
 used to open the diagnostic file.</li>
 <li>Failure to read entire content for large POST requests.</li>
+<li>Fix behavior of OwaNLS to prioritize it over NLS_LANG.</li>
 </ul>
 
 <h4><a name="_notes">General Release Notes</a></h4>
@@ -1565,16 +1566,13 @@ string.  Examples of valid strings:<font color="#000080"><tt><b>
 You may not specify the territory without language.  You may
 not specify the language by itself.  If language is specified, then all
 connections through this Location will have an ALTER SESSION SET
-NLS_LANGUAGE='...' executed prior to commencing operations.  A
-similar command is run for territory, if present.  The character set is used to
+NLS_LANGUAGE='...' executed prior to commencing operations.  A similar
+command is run for territory, if present.  The character set is used to
 deduce an ISO character set return type for HTTP responses coming from
 mod_owa.  It should match the character set actually used by the OCI, e.g.
-the one taken from the startup environment of Apache.  For Oracle 8i, an
-internal API exists to determine this character set from OCI, and mod_owa
-will use that set in preference to the one specified here.  The character
-set may be specified here for Oracle 8.0.x based environments, where it
-is not otherwise possible for mod_owa to obtain the character set from
-OCI.</p></td></tr>
+the one taken from the startup environment of Apache.  Otherwise,
+this character set will be used in preference to the one
+from NLS_LANG.</p></td></tr>
 <tr valign="top"><td align="right">OwaAuth<br>
 <font color="#000080"><i>oracle_ver</i></font></td><td>&nbsp;&nbsp;</td>
 <td><p>The way in which OWA handles authorization callbacks has changed in

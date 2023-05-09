@@ -1,7 +1,7 @@
                      Apache PL/SQL Gateway OWA Module (mod_owa)
                                  Doug McMahon
-                                 March 7, 2023
-                                Version 2.11.16
+                                 May 8, 2023
+                                Version 2.11.17
 
        Copyright (c) 1999-2023 Oracle Corporation, All rights reserved.
 
@@ -279,6 +279,7 @@ Bugs Found/Fixed
 * Intermittent spin in Windows WriteFile routine due to incorrect parameters
   used to open the diagnostic file.
 * Failure to read entire content for large POST requests.
+* Fix behavior of OwaNLS to prioritize it over NLS_LANG.
 
 General Release Notes
 =====================
@@ -1095,13 +1096,9 @@ provided in later sections of this document.
                    set is used to deduce an ISO character set return type
                    for HTTP responses coming from mod_owa.  It should match
                    the character set actually used by the OCI, e.g. the
-                   one taken from the startup environment of Apache.  For
-                   Oracle 8i, an internal API exists to determine this
-                   character set from OCI, and mod_owa will use that set
-                   in preference to the one specified here.  The character
-                   set may be specified here for Oracle 8.0.x based
-                   environments, where it is not otherwise possible for
-                   mod_owa to obtain the character set from OCI.
+                   one taken from the startup environment of Apache.
+                   Otherwise, this character set will be used in preference
+                   to the one from NLS_LANG.
   OwaAuth          The way in which OWA handles authorization callbacks
   oracle_auth      has changed in a recent release.  Previously, it would
                    call OWA_INIT.AUTHORIZE and then execute your request on

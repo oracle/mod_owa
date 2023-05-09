@@ -101,6 +101,7 @@
 ** 06/29/2021   D. McMahon      Log OCI major/minor version numbers
 ** 11/29/2021   D. McMahon      Default dav_mode to -1 (unconfigured)
 ** 03/07/2023   D. McMahon      Added OwaHeader
+** 05/08/2023   D. McMahon      Fix volatile markings in the code
 */
 
 #ifdef APACHE24
@@ -252,7 +253,7 @@ void mowa_semaphore_put(owa_context *octx)
 void morq_create_mutex(request_rec *request, owa_context *octx)
 {
     server_rec    *s;
-    volatile oracle_config *cfg;
+    oracle_config * volatile cfg;
 
     if (!(octx->multithread)) return;
     if (octx->mtctx->c_mutex != os_nullmutex) return;
@@ -546,7 +547,7 @@ char *morq_parse_auth(request_rec *request, char *buffer)
 void morq_add_context(request_rec *request, owa_context *octx)
 {
     server_rec    *s = request->server;
-    volatile oracle_config *cfg;
+    oracle_config * volatile cfg;
     int            latch;
 
     cfg = (oracle_config *)ap_get_module_config(s->module_config, &owa_module);
@@ -622,8 +623,8 @@ void morq_sql_error(request_rec *request,
 */
 static void oracle_thread(void *tctx)
 {
-    volatile oracle_config *cfg = (oracle_config *)tctx;
-    volatile owa_context   *octx;
+    oracle_config * volatile cfg = (oracle_config *)tctx;
+    owa_context   * volatile octx;
     int                     t;
 
     thread_block_signals();
@@ -729,7 +730,7 @@ static int mowa_handler(request_rec *r)
     int          result;
     int          post_flag;
     double       t1, t2;
-    owa_context *octx;
+    owa_context * volatile octx;
     owa_request  owa_req;
 
     if (str_compare(r->handler, "owa_handler", -1, 1)) return(DECLINED);
@@ -1680,7 +1681,7 @@ static apr_status_t oracle_shutdown(void *data)
 static apr_status_t oracle_exit(void *data)
 {
     server_rec    *s = (server_rec *)data;
-    volatile oracle_config *cfg;
+    oracle_config * volatile cfg;
     owa_context   *octx;
     int            latch = 0;
 

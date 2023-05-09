@@ -82,6 +82,7 @@
 ** 01/02/2018   D. McMahon      More info for environment handle failure errors
 ** 03/22/2021   D. McMahon      Ensure handle free on sql_disconnect
 ** 06/29/2021   D. McMahon      Add sql_get_version
+** 05/08/2023   D. McMahon      Add sql_set_nls(), prioritize user NLS setting
 */
 
 #define WITH_OCI
@@ -182,23 +183,26 @@ void sql_get_nls(connection *c, owa_context *octx)
     octx->ora_csid = 0;
 
     /*
-    ** First, attempt to find a match to the OCI's NLS character set
+    ** If the're a character set from httpd.conf, use it
     */
-    status = OCINlsGetInfo(c->envhp, c->errhp, (text *)buf, sizeof(buf) - 1,
-                           (ub2)OCI_NLS_CHARACTER_SET);
-    if (status == OCI_SUCCESS)
+    if (octx->nls_cs[0] != '\0')
     {
-        i = nls_csx_from_oracle(buf);
+        i = nls_csx_from_oracle(octx->nls_cs);
         if (i > 0) octx->ora_csid = i;
     }
 
     /*
-    ** If that fails, then default to the character set from httpd.conf
+    ** Otherwise, attempt to find a match to the OCI's NLS character set
     */
-    if ((octx->ora_csid == 0) && (octx->nls_cs[0] != '\0'))
+    if (octx->ora_csid == 0)
     {
-        i = nls_csx_from_oracle(octx->nls_cs);
+      status = OCINlsGetInfo(c->envhp, c->errhp, (text *)buf, sizeof(buf) - 1,
+                             (ub2)OCI_NLS_CHARACTER_SET);
+      if (status == OCI_SUCCESS)
+      {
+        i = nls_csx_from_oracle(buf);
         if (i > 0) octx->ora_csid = i;
+      }
     }
 
     if (octx->ora_csid)
@@ -237,6 +241,19 @@ void sql_get_nls(connection *c, owa_context *octx)
     }
 
     octx->nls_init = 1;
+}
+
+/*
+** Set alternate character set for strings (if necessary for DAD)
+*/
+void sql_set_nls(connection *c, owa_context *octx)
+{
+  if (!(octx->nls_init))
+    return;
+  else if ((octx->ora_csid) && (octx->dad_csid != octx->ora_csid))
+    c->csid = nls_csid(octx->dad_csid);
+  else if ((octx->ncflag & (~UNI_MODE_RAW)) && (octx->dad_csid))
+    c->csid = nls_csid(octx->dad_csid);
 }
 
 /*
@@ -786,10 +803,7 @@ setup_connection:
     /*
     ** Set alternate character set for strings (if necessary for DAD)
     */
-    if ((octx->ora_csid) && (octx->dad_csid != octx->ora_csid))
-        c->csid = nls_csid(octx->dad_csid);
-    else if ((octx->ncflag & (~UNI_MODE_RAW)) && (octx->dad_csid))
-        c->csid = nls_csid(octx->dad_csid);
+    sql_set_nls(c, octx);
     c->ncflag = (octx->ncflag & UNI_MODE_FULL);
 
     return(status);

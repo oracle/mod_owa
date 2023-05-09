@@ -127,6 +127,7 @@
 ** 03/30/2022   D. McMahon      Use HTBUF_ENV_MAX for CGI variables
 ** 07/04/2022   D. McMahon      Fix handling of empty string in array pivot
 ** 03/07/2023   D. McMahon      OwaHeader support
+** 05/08/2023   D. McMahon      Fix volatile markings in the code
 */
 
 #define WITH_OCI
@@ -193,7 +194,7 @@ static void *resize_arr(request_rec *r, void *ptr, int elsize, int currsz)
 static connection *lock_connection(owa_context *octx, char *session)
 {
     int                   i;
-    volatile connection *cptr;
+    connection * volatile cptr;
 
     if (octx->poolsize == 0) return((connection *)0);
 
@@ -287,7 +288,7 @@ static connection *lock_connection(owa_context *octx, char *session)
 */
 static void unlock_connection(owa_context *octx, connection *c)
 {
-    volatile connection *cptr = c;
+    connection * volatile cptr = c;
     int                   lock_state;
     long_64               t;
 
@@ -610,7 +611,7 @@ static void cache_describe(owa_context *octx, char *pname, int nargs,
         /* Add to describe cache */
         mowa_acquire_mutex(octx);
         {
-          volatile owa_context *optr = octx;
+          owa_context * volatile optr = octx;
           /* ### This should use a compare-and-swap ### */
           dptr->next = optr->desc_cache;
           optr->desc_cache = dptr;
@@ -4654,11 +4655,19 @@ retry:
             if (!(c->session)) c->session = str_dup(session);
         }
 
-        if (!(octx->nls_init))
         {
-          mowa_acquire_mutex(octx);
-          if (!(octx->nls_init)) sql_get_nls(c, octx);
-          mowa_release_mutex(octx);
+          owa_context * volatile vctx = octx;
+          if (!(vctx->nls_init))
+          {
+            mowa_acquire_mutex(octx);
+            if (!(vctx->nls_init))
+              sql_get_nls(c, octx);
+            else /* Otherwise be sure to set up the connection NLS */
+              sql_set_nls(c, octx);
+            mowa_release_mutex(octx);
+          }
+          else /* Otherwise be sure to set up the connection NLS */
+            sql_set_nls(c, octx);
         }
 
         ++sphase;
